@@ -214,6 +214,7 @@ public final class BuiltinMacros {
     public static let BUILT_PRODUCTS_DIR = BuiltinMacros.declarePathMacro("BUILT_PRODUCTS_DIR")
     public static let CONFIGURATION_BUILD_DIR = BuiltinMacros.declarePathMacro("CONFIGURATION_BUILD_DIR")
     public static let CONFIGURATION_TEMP_DIR = BuiltinMacros.declarePathMacro("CONFIGURATION_TEMP_DIR")
+    public static let CODESIZE_PROFILE_OUTPUT_DIR = BuiltinMacros.declarePathMacro("CODESIZE_PROFILE_OUTPUT_DIR")
     public static let PACKAGE_TYPE = BuiltinMacros.declareStringMacro("PACKAGE_TYPE")
     public static let PRODUCT_NAME = BuiltinMacros.declareStringMacro("PRODUCT_NAME")
     public static let PRODUCT_TYPE = BuiltinMacros.declareStringMacro("PRODUCT_TYPE")
@@ -233,6 +234,7 @@ public final class BuiltinMacros {
     public static let DEPLOYMENT_POSTPROCESSING = BuiltinMacros.declareBooleanMacro("DEPLOYMENT_POSTPROCESSING")
     public static let ENABLE_TESTABILITY = BuiltinMacros.declareBooleanMacro("ENABLE_TESTABILITY")
     public static let ENABLE_TESTING_SEARCH_PATHS = BuiltinMacros.declareBooleanMacro("ENABLE_TESTING_SEARCH_PATHS")
+    public static let ENABLE_CODESIZE_PROFILE = BuiltinMacros.declareBooleanMacro("ENABLE_CODESIZE_PROFILE")
     public static let ENABLE_PRIVATE_TESTING_SEARCH_PATHS = BuiltinMacros.declareBooleanMacro("ENABLE_PRIVATE_TESTING_SEARCH_PATHS")
     public static let EXPERIMENTAL_ALLOW_INSTALL_HEADERS_FILTERING = BuiltinMacros.declareBooleanMacro("EXPERIMENTAL_ALLOW_INSTALL_HEADERS_FILTERING")
     public static let GCC_SYMBOLS_PRIVATE_EXTERN = BuiltinMacros.declareBooleanMacro("GCC_SYMBOLS_PRIVATE_EXTERN")
@@ -1038,6 +1040,9 @@ public final class BuiltinMacros {
     public static let SWIFT_DEVELOPMENT_TOOLCHAIN = BuiltinMacros.declareBooleanMacro("SWIFT_DEVELOPMENT_TOOLCHAIN")
     public static let SWIFT_EMIT_LOC_STRINGS = BuiltinMacros.declareBooleanMacro("SWIFT_EMIT_LOC_STRINGS")
     public static let SWIFT_EMIT_MODULE_INTERFACE = BuiltinMacros.declareBooleanMacro("SWIFT_EMIT_MODULE_INTERFACE")
+    public static let SWIFT_EMIT_SIL_FILES = BuiltinMacros.declareBooleanMacro("SWIFT_EMIT_SIL_FILES")
+    public static let SWIFT_EMIT_IR_FILES = BuiltinMacros.declareBooleanMacro("SWIFT_EMIT_IR_FILES")
+    public static let SWIFT_EMIT_OPT_RECORDS = BuiltinMacros.declareBooleanMacro("SWIFT_EMIT_OPT_RECORDS")
     public static let SWIFT_ENABLE_BATCH_MODE = BuiltinMacros.declareBooleanMacro("SWIFT_ENABLE_BATCH_MODE")
     public static let SWIFT_ENABLE_INCREMENTAL_COMPILATION = BuiltinMacros.declareBooleanMacro("SWIFT_ENABLE_INCREMENTAL_COMPILATION")
     public static let SWIFT_ENABLE_INCREMENTAL_SCAN = BuiltinMacros.declareBooleanMacro("SWIFT_ENABLE_INCREMENTAL_SCAN")
@@ -1091,6 +1096,9 @@ public final class BuiltinMacros {
     public static let SWIFT_INSTALL_MODULE = BuiltinMacros.declareBooleanMacro("SWIFT_INSTALL_MODULE")
     public static let SWIFT_INSTALL_MODULE_FOR_DEPLOYMENT = BuiltinMacros.declareBooleanMacro("SWIFT_INSTALL_MODULE_FOR_DEPLOYMENT")
     public static let SWIFT_INSTALL_MODULE_ABI_DESCRIPTOR = BuiltinMacros.declareBooleanMacro("SWIFT_INSTALL_MODULE_ABI_DESCRIPTOR")
+    public static let SWIFT_IR_OUTPUT_DIR = BuiltinMacros.declarePathMacro("SWIFT_IR_OUTPUT_DIR")
+    public static let SWIFT_OPT_RECORD_OUTPUT_DIR = BuiltinMacros.declarePathMacro("SWIFT_OPT_RECORD_OUTPUT_DIR")
+    public static let SWIFT_SIL_OUTPUT_DIR = BuiltinMacros.declarePathMacro("SWIFT_SIL_OUTPUT_DIR")
     public static let SWIFT_STDLIB = BuiltinMacros.declareStringMacro("SWIFT_STDLIB")
     public static let SWIFT_STDLIB_TOOL = BuiltinMacros.declareStringMacro("SWIFT_STDLIB_TOOL")
     public static let SWIFT_STDLIB_TOOL_FOLDERS_TO_SCAN = BuiltinMacros.declarePathListMacro("SWIFT_STDLIB_TOOL_FOLDERS_TO_SCAN")
@@ -1604,6 +1612,7 @@ public final class BuiltinMacros {
         CONFIGURATION,
         CONFIGURATION_BUILD_DIR,
         CONFIGURATION_TEMP_DIR,
+        CODESIZE_PROFILE_OUTPUT_DIR,
         CONTENTS_FOLDER_PATH,
         COPYING_PRESERVES_HFS_DATA,
         COPY_HEADERS_RUN_UNIFDEF,
@@ -1770,6 +1779,7 @@ public final class BuiltinMacros {
         ENABLE_SIGNATURE_AGGREGATION,
         ENABLE_TESTABILITY,
         ENABLE_TESTING_SEARCH_PATHS,
+        ENABLE_CODESIZE_PROFILE,
         ENABLE_PRIVATE_TESTING_SEARCH_PATHS,
         ENABLE_THREAD_SANITIZER,
         ENABLE_UNDEFINED_BEHAVIOR_SANITIZER,
@@ -2269,6 +2279,9 @@ public final class BuiltinMacros {
         SWIFT_DEVELOPMENT_TOOLCHAIN,
         SWIFT_EMIT_LOC_STRINGS,
         SWIFT_EMIT_MODULE_INTERFACE,
+        SWIFT_EMIT_SIL_FILES,
+        SWIFT_EMIT_IR_FILES,
+        SWIFT_EMIT_OPT_RECORDS,
         SWIFT_ENABLE_BATCH_MODE,
         SWIFT_ENABLE_INCREMENTAL_COMPILATION,
         SWIFT_ENABLE_INCREMENTAL_SCAN,
@@ -2329,7 +2342,10 @@ public final class BuiltinMacros {
         SWIFT_INSTALL_MODULE,
         SWIFT_INSTALL_MODULE_FOR_DEPLOYMENT,
         SWIFT_INSTALL_MODULE_ABI_DESCRIPTOR,
+        SWIFT_IR_OUTPUT_DIR,
+        SWIFT_OPT_RECORD_OUTPUT_DIR,
         SWIFT_RESPONSE_FILE_PATH,
+        SWIFT_SIL_OUTPUT_DIR,
         SWIFT_STDLIB,
         SWIFT_STDLIB_TOOL,
         SWIFT_STDLIB_TOOL_FOLDERS_TO_SCAN,
