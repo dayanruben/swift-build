@@ -704,7 +704,7 @@ public final class BuiltinMacros {
     public static let EXPORTED_SYMBOLS_FILE = BuiltinMacros.declarePathMacro("EXPORTED_SYMBOLS_FILE")
     public static let EXTENSIONS_FOLDER_PATH = BuiltinMacros.declarePathMacro("EXTENSIONS_FOLDER_PATH")
     public static let FRAMEWORKS_FOLDER_PATH = BuiltinMacros.declarePathMacro("FRAMEWORKS_FOLDER_PATH")
-    public static let FRAMEWORK_SEARCH_PATHS = BuiltinMacros.declarePathListMacro("FRAMEWORK_SEARCH_PATHS")
+    public static let FRAMEWORK_SEARCH_PATHS = BuiltinMacros.declarePathOrderedSetMacro("FRAMEWORK_SEARCH_PATHS")
     public static let FRAMEWORK_VERSION = BuiltinMacros.declareStringMacro("FRAMEWORK_VERSION")
     public static let FULL_PRODUCT_NAME = BuiltinMacros.declarePathMacro("FULL_PRODUCT_NAME")
     public static let FUSE_BUILD_PHASES = BuiltinMacros.declareBooleanMacro("FUSE_BUILD_PHASES")
@@ -954,6 +954,7 @@ public final class BuiltinMacros {
     public static let PLIST_FILE_OUTPUT_FORMAT = BuiltinMacros.declareStringMacro("PLIST_FILE_OUTPUT_FORMAT")
     public static let PLUGINS_FOLDER_PATH = BuiltinMacros.declarePathMacro("PLUGINS_FOLDER_PATH")
     public static let __POPULATE_COMPATIBILITY_ARCH_MAP = BuiltinMacros.declareBooleanMacro("__POPULATE_COMPATIBILITY_ARCH_MAP")
+    public static let PRELINK_DEPENDENCY_INFO_FILE = BuiltinMacros.declarePathMacro("PRELINK_DEPENDENCY_INFO_FILE")
     public static let PRELINK_FLAGS = BuiltinMacros.declareStringListMacro("PRELINK_FLAGS")
     public static let PRELINK_LIBS = BuiltinMacros.declareStringListMacro("PRELINK_LIBS")
     public static let PRIVATE_HEADERS_FOLDER_PATH = BuiltinMacros.declarePathMacro("PRIVATE_HEADERS_FOLDER_PATH")
@@ -1047,6 +1048,7 @@ public final class BuiltinMacros {
     public static let SWIFT_ENABLE_OPAQUE_TYPE_ERASURE = BuiltinMacros.declareBooleanMacro("SWIFT_ENABLE_OPAQUE_TYPE_ERASURE")
     public static let SWIFT_ENABLE_LANGUAGE_FEATURE_ENABLEMENT_DIAGNOSTICS = BuiltinMacros.declareBooleanMacro("SWIFT_ENABLE_LANGUAGE_FEATURE_ENABLEMENT_DIAGNOSTICS")
     public static let SWIFT_EMIT_CONST_VALUE_PROTOCOLS = BuiltinMacros.declareStringListMacro("SWIFT_EMIT_CONST_VALUE_PROTOCOLS")
+    public static let SWIFT_GENERATE_ADDITIONAL_LINKER_ARGS = BuiltinMacros.declareBooleanMacro("SWIFT_GENERATE_ADDITIONAL_LINKER_ARGS")
     public static let SWIFT_USE_INTEGRATED_DRIVER = BuiltinMacros.declareBooleanMacro("SWIFT_USE_INTEGRATED_DRIVER")
     public static let SWIFT_EAGER_MODULE_EMISSION_IN_WMO = BuiltinMacros.declareBooleanMacro("SWIFT_EAGER_MODULE_EMISSION_IN_WMO")
     public static let SWIFT_ENABLE_EXPLICIT_MODULES = BuiltinMacros.declareEnumMacro("SWIFT_ENABLE_EXPLICIT_MODULES") as EnumMacroDeclaration<SwiftEnableExplicitModulesSetting>
@@ -1405,6 +1407,10 @@ public final class BuiltinMacros {
         return try! builtinNamespace.declarePathListMacro(name)
     }
 
+    @_spi(MacroDeclarationRegistration) public static func declarePathOrderedSetMacro(_ name: String) -> PathOrderedSetMacroDeclaration {
+        precondition(!initialized)
+        return try! builtinNamespace.declarePathOrderedSetMacro(name)
+    }
 
     private static let namespaceInitializationMutex = SWBMutex(())
 
@@ -2124,6 +2130,7 @@ public final class BuiltinMacros {
         PLIST_FILE_OUTPUT_FORMAT,
         PLUGINS_FOLDER_PATH,
         __POPULATE_COMPATIBILITY_ARCH_MAP,
+        PRELINK_DEPENDENCY_INFO_FILE,
         PRELINK_FLAGS,
         PRELINK_LIBS,
         PRIVATE_HEADERS_FOLDER_PATH,
@@ -2279,6 +2286,7 @@ public final class BuiltinMacros {
         SWIFT_ENABLE_OPAQUE_TYPE_ERASURE,
         SWIFT_ENABLE_LANGUAGE_FEATURE_ENABLEMENT_DIAGNOSTICS,
         SWIFT_EMIT_CONST_VALUE_PROTOCOLS,
+        SWIFT_GENERATE_ADDITIONAL_LINKER_ARGS,
         SWIFT_ENABLE_TESTABILITY,
         SWIFT_EXEC,
         SWIFT_FORCE_DYNAMIC_LINK_STDLIB,

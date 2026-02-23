@@ -126,6 +126,7 @@ struct GenericUnixSDKRegistryExtension: SDKRegistryExtension {
                 defaultProperties = [
                     // Workaround to avoid `-dependency_info`.
                     "LD_DEPENDENCY_INFO_FILE": .plString(""),
+                    "PRELINK_DEPENDENCY_INFO_FILE": .plString(""),
 
                     "GENERATE_TEXT_BASED_STUBS": "NO",
                     "GENERATE_INTERMEDIATE_TEXT_BASED_STUBS": "NO",
@@ -207,7 +208,7 @@ struct GenericUnixSDKRegistryExtension: SDKRegistryExtension {
                     }
                     sysroot = swiftSDK.path
                     architectures = try swiftSDK.targetTriples.keys.map { try LLVMTriple($0).arch }.sorted()
-                    tripleVersion = try Set(swiftSDK.targetTriples.keys.compactMap { try LLVMTriple($0).systemVersion }).only?.description
+                    tripleVersion = try Set(swiftSDK.targetTriples.keys.compactMap { try LLVMTriple($0).version }).only?.description
                     customProperties = try Dictionary(uniqueKeysWithValues: swiftSDK.targetTriples.map { targetTriple in
                         try ("__SYSROOT_\(LLVMTriple(targetTriple.key).arch)", .plString(swiftSDK.path.join(targetTriple.value.sdkRootPath).str))
                     }).merging([

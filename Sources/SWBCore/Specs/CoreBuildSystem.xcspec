@@ -123,7 +123,7 @@
             },
             {
                 Name = "FRAMEWORK_SEARCH_PATHS";
-                Type = PathList;
+                Type = PathOrderedSet;
                 DefaultValue = "";
                 ConditionFlavors = (
                     arch,
@@ -456,6 +456,11 @@
                 Name = "PRELINK_FLAGS";
                 Type = stringlist;
                 DefaultValue = "";
+            },
+            {
+                Name = "PRELINK_DEPENDENCY_INFO_FILE";
+                Type = Path;
+                DefaultValue = "$(OBJECT_FILE_DIR_$(CURRENT_VARIANT))/$(CURRENT_ARCH)/$(PRODUCT_NAME)_prelink_dependency_info.dat";
             },
             {
                 Name = "LD_NO_PIE";
@@ -1152,7 +1157,7 @@ When `GENERATE_INFOPLIST_FILE` is enabled, sets the value of the [CFBundleIdenti
             },
             {
                 Name = "FRAMEWORK_SEARCH_PATHS";
-                Type = PathList;
+                Type = PathOrderedSet;
                 Category = "Search Paths";
                 ConditionFlavors = (
                     arch,
@@ -1651,6 +1656,15 @@ When `GENERATE_INFOPLIST_FILE` is enabled, sets the value of the [CFBundleIdenti
                 Type = StringList;
                 Category = "Linking - General";
                 DefaultValue = "";
+                ConditionFlavors = (
+                    arch,
+                    sdk,
+                );
+            },
+            {
+                Name = "PRELINK_DEPENDENCY_INFO_FILE";
+                Type = Path;
+                DefaultValue = "$(OBJECT_FILE_DIR_$(CURRENT_VARIANT))/$(CURRENT_ARCH)/$(PRODUCT_NAME)_prelink_dependency_info.dat";
                 ConditionFlavors = (
                     arch,
                     sdk,

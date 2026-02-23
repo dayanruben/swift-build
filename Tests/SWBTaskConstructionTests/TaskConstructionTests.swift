@@ -918,7 +918,9 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
                             .namePattern(.prefix("target-"))])
 
                         task.checkOutputs([
-                            .path("\(SRCROOT)/build/aProject.build/Release/AppTarget.build/Objects-normal/AppTarget-\(results.runDestinationTargetArchitecture)-prelink.o"),])
+                            .path("\(SRCROOT)/build/aProject.build/Release/AppTarget.build/Objects-normal/AppTarget-\(results.runDestinationTargetArchitecture)-prelink.o"),
+                            .path("\(SRCROOT)/build/aProject.build/Release/AppTarget.build/Objects-normal/\(results.runDestinationTargetArchitecture)/AppTarget_prelink_dependency_info.dat"),
+                        ])
 
                     }
 
@@ -4109,7 +4111,7 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
                             searchPaths.append(arg)
                         }
                     }
-                    #expect(searchPaths == ["-iquote", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-generated-files.hmap", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-own-target-headers.hmap", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-all-target-headers.hmap", "-iquote", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-project-headers.hmap", "-I\(SRCROOT)/build/Debug/include", "-I/Local/Library/Headers", "-I../../Sources", "-isystem", "/System/Library/Include", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources-normal/\(results.runDestinationTargetArchitecture)", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources/\(results.runDestinationTargetArchitecture)", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources",  "-F\(SRCROOT)/build/Debug", "-F/Local/Library/Frameworks", "-F/Local/Library/Frameworks", "-iframework", "/System/Library/PrivateFrameworks"])
+                    #expect(searchPaths == ["-iquote", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-generated-files.hmap", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-own-target-headers.hmap", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-all-target-headers.hmap", "-iquote", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-project-headers.hmap", "-I\(SRCROOT)/build/Debug/include", "-I/Local/Library/Headers", "-I../../Sources", "-isystem", "/System/Library/Include", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources-normal/\(results.runDestinationTargetArchitecture)", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources/\(results.runDestinationTargetArchitecture)", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources",  "-F\(SRCROOT)/build/Debug", "-F/Local/Library/Frameworks", "-iframework", "/System/Library/PrivateFrameworks"])
                 }
 
                 // Check options in the swiftc command.
@@ -4136,7 +4138,7 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
                             }
                         }
                     }
-                    #expect(searchPaths == ["-I", "\(SRCROOT)/build/Debug", "-F", "\(SRCROOT)/build/Debug", "-F", "/Local/Library/Frameworks", "-F", "/Local/Library/Frameworks", "-F", "/System/Library/PrivateFrameworks", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/swift-overrides.hmap", "-Xcc", "-iquote", "-Xcc", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-generated-files.hmap", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-own-target-headers.hmap", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-all-target-headers.hmap", "-Xcc", "-iquote", "-Xcc", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-project-headers.hmap", "-Xcc", "-I\(SRCROOT)/build/Debug/include", "-Xcc", "-I/Local/Library/Headers", "-Xcc", "-I../../Sources", "-Xcc", "-isystem", "-Xcc", "/System/Library/Include", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources-normal/\(results.runDestinationTargetArchitecture)", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources/\(results.runDestinationTargetArchitecture)", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources"])
+                    #expect(searchPaths == ["-I", "\(SRCROOT)/build/Debug", "-F", "\(SRCROOT)/build/Debug", "-F", "/Local/Library/Frameworks", "-F", "/System/Library/PrivateFrameworks", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/swift-overrides.hmap", "-Xcc", "-iquote", "-Xcc", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-generated-files.hmap", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-own-target-headers.hmap", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-all-target-headers.hmap", "-Xcc", "-iquote", "-Xcc", "\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/\(targetName)-project-headers.hmap", "-Xcc", "-I\(SRCROOT)/build/Debug/include", "-Xcc", "-I/Local/Library/Headers", "-Xcc", "-I../../Sources", "-Xcc", "-isystem", "-Xcc", "/System/Library/Include", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources-normal/\(results.runDestinationTargetArchitecture)", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources/\(results.runDestinationTargetArchitecture)", "-Xcc", "-I\(SRCROOT)/build/aProject.build/Debug/\(targetName).build/DerivedSources"])
                 }
 
                 // Check options in the link command.
@@ -4156,7 +4158,7 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
                         }
                     }
                     // Note that system framework search paths are presently not deduplicated for the linker args.
-                    #expect(searchPaths == ["-L\(SRCROOT)/build/EagerLinkingTBDs/Debug", "-L\(SRCROOT)/build/Debug", "-L/Local/Library/Libs", "-F\(SRCROOT)/build/EagerLinkingTBDs/Debug", "-F\(SRCROOT)/build/Debug", "-F/Local/Library/Frameworks", "-F/Local/Library/Frameworks", "-iframework", "/System/Library/PrivateFrameworks", "-iframework", "/Local/Library/Frameworks", "-iframework", "/Local/Library/Frameworks", "-L\(core.developerPath.path.str)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx", "-L/usr/lib/swift"])
+                    #expect(searchPaths == ["-L\(SRCROOT)/build/EagerLinkingTBDs/Debug", "-L\(SRCROOT)/build/Debug", "-L/Local/Library/Libs", "-F\(SRCROOT)/build/EagerLinkingTBDs/Debug", "-F\(SRCROOT)/build/Debug", "-F/Local/Library/Frameworks", "-iframework", "/System/Library/PrivateFrameworks", "-iframework", "/Local/Library/Frameworks", "-iframework", "/Local/Library/Frameworks", "-L\(core.developerPath.path.str)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx", "-L/usr/lib/swift"])
                     // FIXME: <rdar://problem/37033578> [Swift Build] Extra "//" in framework search path for Ld command
                 }
             }
@@ -9459,6 +9461,7 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
             let boundsSafetyMissingChecksSetting = "CLANG_BOUNDS_SAFETY_BRINGUP_MISSING_CHECKS"
             let enableBoundsAttributesSetting = "CLANG_ENABLE_BOUNDS_ATTRIBUTES"
             let boundsSafetyMissingChecksOptOutsSetting = "CLANG_BOUNDS_SAFETY_BRINGUP_MISSING_CHECKS_OPT_OUTS"
+            let boundsSafetySoftTrapsSetting = "CLANG_BOUNDS_SAFETY_SOFT_TRAPS"
 
             for (enableBoundsSafetyBuildSetting, enableBoundsSafetyFlag) in [
                 (enableBoundsSafetySetting,"-fbounds-safety"),
@@ -9478,6 +9481,8 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
                     [ enableBoundsSafetyBuildSetting: "YES"]: { (task: any PlannedTask) in
                         task.checkCommandLineDoesNotContain("-fno-bounds-safety-bringup-missing-checks")
                         task.checkCommandLineDoesNotContain("-fbounds-safety-bringup-missing-checks")
+                        // Default is to have soft-traps disabled
+                        task.checkCommandLineNoMatch([.prefix("-fbounds-safety-soft-traps=")])
                     },
 
 
@@ -9504,6 +9509,21 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
                         task.checkCommandLineContains([
                             "-fbounds-safety-bringup-missing-checks=batch_0",
                             "-fno-bounds-safety-bringup-missing-checks=access_size,return_size"])
+                    },
+
+                    // Soft traps
+                    [ enableBoundsSafetyBuildSetting: "YES", boundsSafetySoftTrapsSetting: "compiler-default" ]: { (task: any PlannedTask) in
+                        task.checkCommandLineNoMatch([.prefix("-fbounds-safety-soft-traps=")])
+                    },
+                    [ enableBoundsSafetyBuildSetting: "YES", boundsSafetySoftTrapsSetting: "call-minimal" ]: { (task: any PlannedTask) in
+                        task.checkCommandLineContains(["-fbounds-safety-soft-traps=call-minimal"])
+                        // Check no other variant of the flag is passed after that could override the setting
+                        task.checkCommandLineNoMatch(["-fbounds-safety-soft-traps=call-minimal", .anySequence, .prefix("-fbounds-safety-soft-traps=")])
+                    },
+                    [ enableBoundsSafetyBuildSetting: "YES", boundsSafetySoftTrapsSetting: "call-with-str" ]: { (task: any PlannedTask) in
+                        task.checkCommandLineContains(["-fbounds-safety-soft-traps=call-with-str"])
+                        // Check no other variant of the flag is passed after that could override the setting
+                        task.checkCommandLineNoMatch(["-fbounds-safety-soft-traps=call-with-str", .anySequence, .prefix("-fbounds-safety-soft-traps=")])
                     },
                 ]
 
