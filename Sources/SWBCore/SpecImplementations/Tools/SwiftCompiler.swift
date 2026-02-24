@@ -1439,6 +1439,12 @@ public final class SwiftCompilerSpec : CompilerSpec, SpecIdentifierType, SwiftDi
                 args.append("-emit-dependencies")
             }
 
+            let codesizeProfileEnabled = cbc.scope.evaluate(BuiltinMacros.ENABLE_CODESIZE_PROFILE)
+            let emitOptRecords = codesizeProfileEnabled || cbc.scope.evaluate(BuiltinMacros.SWIFT_EMIT_OPT_RECORDS)
+            if emitOptRecords {
+                args.append("-save-optimization-record")
+            }
+
             // Generate the .swiftmodule from this compilation to a known location.
             //
             // (We don't care about the intermediate partial swiftmodules, so leave those out of the output file map.)
@@ -2722,6 +2728,21 @@ public final class SwiftCompilerSpec : CompilerSpec, SpecIdentifierType, SwiftDi
         let primarySwiftBaseName = cbc.scope.evaluate(BuiltinMacros.TARGET_NAME) + moduleBaseNameSuffix + "-primary"
         let emitConstSideCarValues = await supportConstSupplementaryMetadata(cbc, delegate, compilationMode: compilationMode)
 
+        let codesizeProfileEnabled = cbc.scope.evaluate(BuiltinMacros.ENABLE_CODESIZE_PROFILE)
+
+        let emitSIL = codesizeProfileEnabled || cbc.scope.evaluate(BuiltinMacros.SWIFT_EMIT_SIL_FILES)
+        let emitIR = codesizeProfileEnabled || cbc.scope.evaluate(BuiltinMacros.SWIFT_EMIT_IR_FILES)
+        let emitOptRecords = codesizeProfileEnabled || cbc.scope.evaluate(BuiltinMacros.SWIFT_EMIT_OPT_RECORDS)
+
+        let codesizeProfileOutputDir: Path? = codesizeProfileEnabled
+            ? cbc.scope.evaluate(BuiltinMacros.CODESIZE_PROFILE_OUTPUT_DIR).nilIfEmpty
+            : nil
+
+        let silOutputDir: Path? = codesizeProfileOutputDir ?? cbc.scope.evaluate(BuiltinMacros.SWIFT_SIL_OUTPUT_DIR).nilIfEmpty
+        let irOutputDir: Path? = codesizeProfileOutputDir ?? cbc.scope.evaluate(BuiltinMacros.SWIFT_IR_OUTPUT_DIR).nilIfEmpty
+        let optRecordOutputDir: Path? = codesizeProfileOutputDir ?? cbc.scope.evaluate(BuiltinMacros.SWIFT_OPT_RECORD_OUTPUT_DIR).nilIfEmpty
+
+
         func createCommonFileEntry(input: FileToBuild) -> (objectFilePath: Path, fileMapEntry: SwiftOutputFileMap.Entry) {
             var fileMapEntry = SwiftOutputFileMap.Entry()
             // The object file.
@@ -2739,6 +2760,7 @@ public final class SwiftCompilerSpec : CompilerSpec, SpecIdentifierType, SwiftDi
                 let bitcodeFilePath = objectFileDir.join(objectFilePrefix + ".bc")
                 fileMapEntry.llvmBitcode = bitcodeFilePath.str
             }
+
             return (objectFilePath, fileMapEntry)
         }
 
@@ -2771,6 +2793,21 @@ public final class SwiftCompilerSpec : CompilerSpec, SpecIdentifierType, SwiftDi
                 // The requested compile-time values
                 if emitConstSideCarValues {
                     fileMapEntry.constValues = objectFileDir.join(objectFilePrefix + ".swiftconstvalues").str
+                }
+
+                if emitSIL {
+                    let silFilePath = (silOutputDir ?? objectFileDir).join(objectFilePrefix + ".sil")
+                    fileMapEntry.sil = silFilePath.str
+                }
+
+                if emitIR {
+                    let irFilePath = (irOutputDir ?? objectFileDir).join(objectFilePrefix + ".ll")
+                    fileMapEntry.llvmIR = irFilePath.str
+                }
+
+                if emitOptRecords {
+                    let optRecordFilePath = (optRecordOutputDir ?? objectFileDir).join(objectFilePrefix + ".opt.yaml")
+                    fileMapEntry.yamlOptRecord = optRecordFilePath.str
                 }
 
                 // Finally add an entry for this file to the map.
@@ -2809,8 +2846,22 @@ public final class SwiftCompilerSpec : CompilerSpec, SpecIdentifierType, SwiftDi
         }
         else {
             // If we are using WMO, then we still generate entries for each file, but several files move to the global map since the source files aren't processed individually.
+            let useParallelWMO = cbc.scope.evaluate(BuiltinMacros.SWIFT_USE_PARALLEL_WHOLE_MODULE_OPTIMIZATION)
             for input in cbc.inputs {
-                mapDict[input.absolutePath.str] = createCommonFileEntry(input: input).fileMapEntry
+                var (objectFilePath, fileMapEntry) = createCommonFileEntry(input: input)
+                let objectFilePrefix = objectFilePath.basenameWithoutSuffix
+                // In parallel WMO, IR and opt-records are per-file; SIL is always module-level.
+                if useParallelWMO {
+                    if emitIR {
+                        let irFilePath = (irOutputDir ?? objectFileDir).join(objectFilePrefix + ".ll")
+                        fileMapEntry.llvmIR = irFilePath.str
+                    }
+                    if emitOptRecords {
+                        let optRecordFilePath = (optRecordOutputDir ?? objectFileDir).join(objectFilePrefix + ".opt.yaml")
+                        fileMapEntry.yamlOptRecord = optRecordFilePath.str
+                    }
+                }
+                mapDict[input.absolutePath.str] = fileMapEntry
             }
 
             // Add global entries to the output file map, keyed under a pseudo-filename of "".
@@ -2848,6 +2899,25 @@ public final class SwiftCompilerSpec : CompilerSpec, SpecIdentifierType, SwiftDi
                 // The PCH file path for generatePCH job.
                 let bridgingHeaderPCHPath = objectFileDir.join(primarySwiftBaseName + "-Bridging-header.pch")
                 fileMapEntry.pch = bridgingHeaderPCHPath.str
+
+                let targetName = cbc.scope.evaluate(BuiltinMacros.TARGET_NAME)
+
+                if emitSIL {
+                    let silFilePath = (silOutputDir ?? objectFileDir).join(targetName + ".sil")
+                    fileMapEntry.sil = silFilePath.str
+                }
+
+                if !useParallelWMO {
+                    if emitIR {
+                        let irFilePath = (irOutputDir ?? objectFileDir).join(targetName + ".ll")
+                        fileMapEntry.llvmIR = irFilePath.str
+                    }
+
+                    if emitOptRecords {
+                        let optRecordFilePath = (optRecordOutputDir ?? objectFileDir).join(targetName + ".opt.yaml")
+                        fileMapEntry.yamlOptRecord = optRecordFilePath.str
+                    }
+                }
 
                 // Add the global entry to the map.
                 mapDict[""] = fileMapEntry
@@ -3497,6 +3567,9 @@ struct SwiftOutputFileMap: Codable {
         var swiftmodule: String?
         var constValues: String?
         var pch: String?
+        var sil: String?
+        var llvmIR: String?
+        var yamlOptRecord: String?
 
         enum CodingKeys: String, CodingKey {
             case object
@@ -3511,6 +3584,9 @@ struct SwiftOutputFileMap: Codable {
             case swiftmodule
             case constValues = "const-values"
             case pch
+            case sil
+            case llvmIR = "llvm-ir"
+            case yamlOptRecord = "yaml-opt-record"
         }
     }
 
