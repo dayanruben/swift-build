@@ -47,12 +47,14 @@ extension Core {
     /// Get an initialized Core suitable for testing.
     ///
     /// This function requires there to be no errors during loading the core.
-    package static func createInitializedTestingCore(skipLoadingPluginsNamed: Set<String>, registerExtraPlugins: @PluginExtensionSystemActor (MutablePluginManager) -> Void, simulatedInferiorProductsPath: Path? = nil, environment: [String:String] = [:], delegate: TestingCoreDelegate? = nil, configurationDelegate: TestingCoreConfigurationDelegate? = nil) async throws -> Core {
+    package static func createInitializedTestingCore(skipLoadingPluginsNamed: Set<String>, registerExtraPlugins: @PluginExtensionSystemActor (MutablePluginManager) -> Void, simulatedInferiorProductsPath: Path? = nil, environment: [String:String] = [:], delegate: TestingCoreDelegate? = nil, configurationDelegate: TestingCoreConfigurationDelegate? = nil, developerPathOverride: DeveloperPath? = nil) async throws -> Core {
         // When this code is being loaded directly via unit tests, find the running Xcode path.
         //
         // This is a "well known" launch parameter set in Xcode's schemes.
         let developerPath: DeveloperPath?
-        if let xcodeDeveloperDirPath = getEnvironmentVariable("XCODE_DEVELOPER_DIR_PATH").map(Path.init) {
+        if let developerPathOverride {
+            developerPath = developerPathOverride
+        } else if let xcodeDeveloperDirPath = getEnvironmentVariable("XCODE_DEVELOPER_DIR_PATH").map(Path.init) {
             developerPath = .xcode(xcodeDeveloperDirPath)
         } else {
             // In the context of auto-generated package schemes, try to infer the active Xcode.
