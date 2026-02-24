@@ -17,28 +17,31 @@ import SWBProtocol
 @_spi(Testing) import SWBCore
 import SWBUtil
 
-private func findWebAssemblySwiftSDK() -> SwiftSDK? {
-    let wasmSDKs = try? SwiftSDK.findSDKs(targetTriples: ["wasm32-unknown-wasip1"], fs: localFS, hostOperatingSystem: ProcessInfo.processInfo.hostOperatingSystem())
-    let nonEmbeddedWASMSDK = wasmSDKs?.filter { !$0.identifier.contains("embedded") }.only
-    return nonEmbeddedWASMSDK
+private func findStaticLinuxSwiftSDK() -> SwiftSDK? {
+    guard let hostArch = Architecture.hostStringValue else {
+        return nil
+    }
+    let triple = "\(hostArch)-swift-linux-musl"
+    let sdks = try? SwiftSDK.findSDKs(targetTriples: [triple], fs: localFS, hostOperatingSystem: ProcessInfo.processInfo.hostOperatingSystem())
+    return sdks?.first
 }
 
 extension Trait where Self == Testing.ConditionTrait {
-    static var requiresWebAssemblySwiftSDK: Self {
-        enabled("WebAssembly Swift SDK is not installed", {
-            return findWebAssemblySwiftSDK() != nil
+    static var requiresStaticLinuxSwiftSDK: Self {
+        enabled("Static Linux Swift SDK is not installed", {
+            return findStaticLinuxSwiftSDK() != nil
         })
     }
 }
 
 @Suite
-fileprivate struct WebAssemblyIntegrationTests: CoreBasedTests {
+fileprivate struct StaticLinuxSDKIntegrationTests: CoreBasedTests {
 
     // Currently, the integration testing GitHub Actions in CI may download a matching toolchain
     // for the Swift SDK if the base image isn't a match. Currently, we hardcode knowledge of where
     // that toolchain will be installed, but we should consider updating the swiftlang shared workflows
     // with a better way of passing along this path.
-    func getWebAssemblySDKIntegrationTestingCore() async throws -> Core {
+    func getStaticLinuxSDKIntegrationTestingCore() async throws -> Core {
         // If a matching toolchain was downloaded, it will be in /github/home/.swift-toolchains
         let userToolchainsDir = Path("/github/home/.swift-toolchains")
         let userToolchains = (try? localFS.listdir(userToolchainsDir)) ?? []
@@ -50,7 +53,7 @@ fileprivate struct WebAssemblyIntegrationTests: CoreBasedTests {
         }
     }
 
-    @Test(.requireSDKs(.host), .requiresWebAssemblySwiftSDK, .skipXcodeToolchain)
+    @Test(.requireSDKs(.host), .requiresStaticLinuxSwiftSDK, .skipXcodeToolchain, .requireHostOS(.linux))
     func basicExecutable() async throws {
         try await withTemporaryDirectory { (tmpDir: Path) in
             let testProject = try await TestProject(
@@ -80,27 +83,31 @@ fileprivate struct WebAssemblyIntegrationTests: CoreBasedTests {
                         ],
                     )
                 ])
-            let core = try await getWebAssemblySDKIntegrationTestingCore()
+
+            let core = try await getStaticLinuxSDKIntegrationTestingCore()
             let tester = try await BuildOperationTester(core, testProject, simulated: false)
 
             let projectDir = tester.workspace.projects[0].sourceRoot
 
             try await tester.fs.writeFileContents(projectDir.join("main.swift")) { stream in
                 stream <<< """
-                    #if os(WASI)
-                    print("Hello from WebAssembly!")
+                    #if canImport(Musl)
+                    print("Hello from Static Linux!")
+                    #else
+                    #error("should not be enabled")
                     #endif
                 """
             }
 
-            let swiftSDK = try #require(findWebAssemblySwiftSDK())
-            let destination = RunDestinationInfo(buildTarget: .swiftSDK(sdkManifestPath: swiftSDK.manifestPath.str, triple: "wasm32-unknown-wasip1"), targetArchitecture: "wasm32", supportedArchitectures: ["wasm32"], disableOnlyActiveArch: false)
+            let hostArch = try #require(Architecture.hostStringValue)
+            let triple = "\(hostArch)-swift-linux-musl"
+            let swiftSDK = try #require(findStaticLinuxSwiftSDK())
+            let destination = RunDestinationInfo(buildTarget: .swiftSDK(sdkManifestPath: swiftSDK.manifestPath.str, triple: triple), targetArchitecture: hostArch, supportedArchitectures: [hostArch], disableOnlyActiveArch: false)
             try await tester.checkBuild(runDestination: destination) { results in
                 results.checkNoErrors()
-                let wasmKitPath = try #require(try core.coreSettings.defaultToolchain?.executableSearchPaths.lookup(subject: .executable(basename: "wasmkit"), operatingSystem: ProcessInfo.processInfo.hostOperatingSystem()))
-                let executionResult = try await Process.getOutput(url: URL(fileURLWithPath: wasmKitPath.str), arguments: ["run", projectDir.join("build").join("Debug-webassembly").join("tool").str])
+                let executionResult = try await Process.getOutput(url: URL(fileURLWithPath: projectDir.join("build").join("Debug-linux").join("tool").str), arguments: [])
                 #expect(executionResult.exitStatus == .exit(0))
-                #expect(String(decoding: executionResult.stdout, as: UTF8.self) == "Hello from WebAssembly!\n")
+                #expect(String(decoding: executionResult.stdout, as: UTF8.self) == "Hello from Static Linux!\n")
                 #expect(String(decoding: executionResult.stderr, as: UTF8.self) == "")
             }
         }

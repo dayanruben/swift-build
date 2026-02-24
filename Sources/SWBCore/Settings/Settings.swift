@@ -2029,8 +2029,7 @@ private class SettingsBuilder: ProjectMatchLookup {
 
         // If the build system was initialized as part of a swift toolchain, push that toolchain ahead of the default toolchain, if they are not the same (e.g. when on macOS where an Xcode install exists).
         if case .swiftToolchain(let path, xcodeDeveloperPath: _) = core.developerPath {
-            if let developerPathToolchain = core.toolchainRegistry.toolchains.first(where: { $0.path.normalize() == path.normalize() }),
-               developerPathToolchain != coreSettings.defaultToolchain {
+            if let developerPathToolchain = core.toolchainRegistry.toolchains.filter({ $0.path.normalize() == path.normalize() }).only {
                 toolchains.append(developerPathToolchain)
             }
         }
