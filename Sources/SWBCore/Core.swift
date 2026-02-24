@@ -276,31 +276,31 @@ public final class Core: Sendable {
 
             switch developerPath {
             case .xcode(let path):
-                toolchainPaths.append(.init(path: path.join("Toolchains"), strict: path.str.hasSuffix(".app/Contents/Developer")))
+                toolchainPaths.append(.init(path: path.join("Toolchains"), strict: path.str.hasSuffix(".app/Contents/Developer"), type: .toolchainsDirectoryPath))
             case .swiftToolchain(let path, xcodeDeveloperPath: let xcodeDeveloperPath):
                 if hostOperatingSystem == .windows {
-                    toolchainPaths.append(.init(path: path.join("Toolchains"), strict: true, aliases: ["default"]))
-                } else {
-                    toolchainPaths.append(.init(path: path, strict: true))
+                    toolchainPaths.append(.init(path: path.join("Toolchains"), strict: true, type: .toolchainsDirectoryPath, aliases: ["default"]))
+                } else if !path.isRoot {
+                    toolchainPaths.append(.init(path: path, strict: false, type: .toolchainPath))
                 }
                 if let xcodeDeveloperPath {
-                    toolchainPaths.append(.init(path: xcodeDeveloperPath.join("Toolchains"), strict: xcodeDeveloperPath.str.hasSuffix(".app/Contents/Developer")))
+                    toolchainPaths.append(.init(path: xcodeDeveloperPath.join("Toolchains"), strict: xcodeDeveloperPath.str.hasSuffix(".app/Contents/Developer"), type: .toolchainsDirectoryPath))
                 }
             }
 
             // FIXME: We should support building the toolchain locally (for `inferiorProductsPath`).
 
-            toolchainPaths.append(.init(path: Path("/Library/Developer/Toolchains"), strict: false))
+            toolchainPaths.append(.init(path: Path("/Library/Developer/Toolchains"), strict: false, type: .toolchainsDirectoryPath))
 
             if let homeString = getEnvironmentVariable("HOME")?.nilIfEmpty {
                 let userToolchainsPath = Path(homeString).join("Library/Developer/Toolchains")
-                toolchainPaths.append(.init(path: userToolchainsPath, strict: false))
+                toolchainPaths.append(.init(path: userToolchainsPath, strict: false, type: .toolchainsDirectoryPath))
             }
 
             if let externalToolchainDirs = getEnvironmentVariable("EXTERNAL_TOOLCHAINS_DIR") ?? environment["EXTERNAL_TOOLCHAINS_DIR"] {
                 let envPaths = externalToolchainDirs.split(separator: Path.pathEnvironmentSeparator)
                 for envPath in envPaths {
-                    toolchainPaths.append(.init(path: Path(envPath), strict: false))
+                    toolchainPaths.append(.init(path: Path(envPath), strict: false, type: .toolchainsDirectoryPath))
                 }
             }
 
