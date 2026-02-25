@@ -65,15 +65,28 @@ public struct SwiftSDK: Sendable {
         let targetTriples: [String: TripleProperties]
     }
 
-    public struct Toolset: Codable {
-        public struct Tool: Codable {
+    public struct Toolset: Codable, Sendable {
+        public struct Tool: Codable, Sendable {
             public let extraCLIOptions: [String]?
+
+            public init(extraCLIOptions: [String]? = nil) {
+                self.extraCLIOptions = extraCLIOptions
+            }
         }
 
+        public let schemaVersion: String
         public let rootPath: String?
         public let cCompiler: Tool?
         public let swiftCompiler: Tool?
         public let linker: Tool?
+
+        public init(schemaVersion: String = "1.0", rootPath: String? = nil, cCompiler: Tool? = nil, swiftCompiler: Tool? = nil, linker: Tool? = nil) {
+            self.schemaVersion = schemaVersion
+            self.rootPath = rootPath
+            self.cCompiler = cCompiler
+            self.swiftCompiler = swiftCompiler
+            self.linker = linker
+        }
     }
 
     /// The identifier of the artifact bundle containing this SDK.
