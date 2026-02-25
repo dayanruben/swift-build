@@ -134,10 +134,24 @@ extension CoreBasedTests {
         }
     }
 
+    private var clangPlusPlusInfo: DiscoveredClangToolSpecInfo {
+        get async throws {
+            let (core, defaultToolchain) = try await coreAndToolchain()
+            let clang = try #require(defaultToolchain.executableSearchPaths.findExecutable(operatingSystem: core.hostOperatingSystem, basename: "clang++"), "couldn't find clang in default toolchain")
+            return try await discoveredClangToolInfo(toolPath: clang, arch: "undefined_arch", sysroot: nil)
+        }
+    }
+
     /// The path to the Clang compiler in the default toolchain.
     package var clangCompilerPath: Path {
         get async throws {
             try await clangInfo.toolPath
+        }
+    }
+
+    package var clangPlusPlusCompilerPath: Path {
+        get async throws {
+            try await clangPlusPlusInfo.toolPath
         }
     }
 

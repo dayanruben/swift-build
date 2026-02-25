@@ -461,6 +461,7 @@ public final class BuiltinMacros {
     public static let APPLY_RULES_IN_COPY_FILES = BuiltinMacros.declareBooleanMacro("APPLY_RULES_IN_COPY_FILES")
     public static let APPLY_RULES_IN_COPY_HEADERS = BuiltinMacros.declareBooleanMacro("APPLY_RULES_IN_COPY_HEADERS")
     public static let APPLY_RULES_IN_INSTALLAPI = BuiltinMacros.declareBooleanMacro("APPLY_RULES_IN_INSTALLAPI")
+    public static let AR = BuiltinMacros.declarePathMacro("AR")
     public static let ARCHS_STANDARD = BuiltinMacros.declareStringListMacro("ARCHS_STANDARD")
     public static let ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1 = BuiltinMacros.declareStringListMacro("ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1")
     public static let ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1 = BuiltinMacros.declareStringListMacro("ARCHS_STANDARD_32_BIT_PRE_XCODE_3_1")
@@ -853,6 +854,7 @@ public final class BuiltinMacros {
     public static let LINKER = BuiltinMacros.declareStringMacro("LINKER")
     public static let LINKER_DRIVER = BuiltinMacros.declareEnumMacro("LINKER_DRIVER") as EnumMacroDeclaration<LinkerDriverChoice>
     public static let ALTERNATE_LINKER = BuiltinMacros.declareStringMacro("ALTERNATE_LINKER")
+    public static let ALTERNATE_LINKER_PATH = BuiltinMacros.declarePathMacro("ALTERNATE_LINKER_PATH")
     public static let LINK_OBJC_RUNTIME = BuiltinMacros.declareBooleanMacro("LINK_OBJC_RUNTIME")
     public static let LINK_WITH_STANDARD_LIBRARIES = BuiltinMacros.declareBooleanMacro("LINK_WITH_STANDARD_LIBRARIES")
     public static let LIPO = BuiltinMacros.declareStringMacro("LIPO")
@@ -925,6 +927,7 @@ public final class BuiltinMacros {
     public static let OTHER_CPLUSPLUSFLAGS = BuiltinMacros.declareStringListMacro("OTHER_CPLUSPLUSFLAGS")
     public static let OTHER_DOCC_FLAGS = BuiltinMacros.declareStringListMacro("OTHER_DOCC_FLAGS")
     public static let OTHER_LDFLAGS = BuiltinMacros.declareStringListMacro("OTHER_LDFLAGS")
+    public static let OTHER_LIBTOOLFLAGS = BuiltinMacros.declareStringListMacro("OTHER_LIBTOOLFLAGS")
     public static let OTHER_LIPOFLAGS = BuiltinMacros.declareStringListMacro("OTHER_LIPOFLAGS")
     public static let OTHER_MIGFLAGS = BuiltinMacros.declareStringListMacro("OTHER_MIGFLAGS")
     public static let OTHER_MODULE_VERIFIER_FLAGS = BuiltinMacros.declareStringListMacro("OTHER_MODULE_VERIFIER_FLAGS")
@@ -1455,6 +1458,7 @@ public final class BuiltinMacros {
         ALTERNATE_GROUP,
         LINKER_DRIVER,
         ALTERNATE_LINKER,
+        ALTERNATE_LINKER_PATH,
         ALTERNATE_MODE,
         ALTERNATE_OWNER,
         ALTERNATE_PERMISSIONS_FILES,
@@ -1476,6 +1480,7 @@ public final class BuiltinMacros {
         APPLY_RULES_IN_COPY_FILES,
         APPLY_RULES_IN_COPY_HEADERS,
         APPLY_RULES_IN_INSTALLAPI,
+        AR,
         ARCHS,
         ARCHS_STANDARD,
         ARCHS_STANDARD_32_64_BIT_PRE_XCODE_3_1,
@@ -2091,6 +2096,7 @@ public final class BuiltinMacros {
         OTHER_CPLUSPLUSFLAGS,
         OTHER_DOCC_FLAGS,
         OTHER_LDFLAGS,
+        OTHER_LIBTOOLFLAGS,
         OTHER_LIPOFLAGS,
         OTHER_MIGFLAGS,
         OTHER_MODULE_VERIFIER_FLAGS,

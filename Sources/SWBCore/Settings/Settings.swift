@@ -2862,14 +2862,54 @@ private class SettingsBuilder: ProjectMatchLookup {
             do {
                 let toolset = try buildRequestContext.loadToolset(toolsetPath)
 
-                let extraSwiftCompilerSettings = toolset.swiftCompiler?.extraCLIOptions ?? []
-                guard !extraSwiftCompilerSettings.isEmpty else { continue }
-
                 pushTable(.exportedForNative) { table in
-                    table.push(BuiltinMacros.OTHER_SWIFT_FLAGS,
-                               table.namespace.parseStringList(["$(inherited)"] + extraSwiftCompilerSettings))
-                    table.push(BuiltinMacros.OTHER_LDFLAGS,
-                               table.namespace.parseStringList(["$(inherited)"] + extraSwiftCompilerSettings))
+                    if let path = toolset.swiftCompiler?.path {
+                        table.push(BuiltinMacros.SWIFT_EXEC, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.swiftCompiler?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_SWIFT_FLAGS, table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                        // Historically, SwiftPM passed extra swift compiler flags to swiftc when used as a linker driver.
+                        // To maintain compatibility wherever possible, continue doing this when using swiftc to link.
+                        // In the future, we should consider changes to the toolset.json spec so users can make it clear
+                        // whether or not this behavior is desired.
+                        table.push(
+                            table.namespace.lookupOrDeclareMacro(StringListMacroDeclaration.self, "OTHER_LDFLAGS_FROM_TOOLSET_LINKER_DRIVER_swiftc"),
+                            table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions)
+                        )
+                        table.push(
+                            BuiltinMacros.OTHER_LDFLAGS,
+                            table.namespace.parseStringList(["$(inherited)", "$(OTHER_LDFLAGS_FROM_TOOLSET_LINKER_DRIVER_$(LINKER_DRIVER))"])
+                        )
+                    }
+                    if let path = toolset.cCompiler?.path {
+                        table.push(BuiltinMacros.CC, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.cCompiler?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_CFLAGS, table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                    if let path = toolset.cxxCompiler?.path {
+                        table.push(BuiltinMacros.CPLUSPLUS, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.cxxCompiler?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_CPLUSPLUSFLAGS, table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                    if let path = toolset.linker?.path {
+                        // To match historical SwiftPM behavior, we treat this as the path to the underlying linker as opposed to the linker driver.
+                        table.push(BuiltinMacros.ALTERNATE_LINKER_PATH, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.linker?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_LDFLAGS,
+                                   table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                    if let path = toolset.librarian?.path {
+                        let resolved = toolset.resolveToolPath(path, toolsetPath: toolsetPath).str
+                        table.push(BuiltinMacros.AR, literal: resolved)
+                        table.push(BuiltinMacros.LIBTOOL, literal: resolved)
+                    }
+                    if let extraCLIOptions = toolset.librarian?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_LIBTOOLFLAGS,
+                                   table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
                 }
             } catch {
                 self.errors.append("error processing toolset at \(toolsetPath.str): \(error)")

@@ -920,6 +920,34 @@
                 };
             },
             {
+                Name = "ALTERNATE_LINKER_PATH";
+                Type = Path;
+            },
+            {
+                Name = "CLANG_ALTERNATE_LINKER_PATH";
+                Type = String;
+                DefaultValue = "$(ALTERNATE_LINKER_PATH)";
+                Condition = "$(LINKER_DRIVER) == clang";
+                CommandLineArgs = {
+                    "" = ();
+                    "<<otherwise>>" = (
+                        "--ld-path=$(value)"
+                    );
+                };
+            },
+            {
+                Name = "SWIFTC_ALTERNATE_LINKER_PATH";
+                Type = String;
+                DefaultValue = "$(ALTERNATE_LINKER_PATH)";
+                Condition = "$(LINKER_DRIVER) == swiftc";
+                CommandLineArgs = {
+                    "" = ();
+                    "<<otherwise>>" = (
+                        "-ld-path=$(value)"
+                    );
+                };
+            },
+            {
                 Name = "LINKER_FILE_LIST_FORMAT";
                 Type = Enumeration;
                 Values = (

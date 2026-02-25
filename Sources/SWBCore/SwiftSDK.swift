@@ -67,9 +67,11 @@ public struct SwiftSDK: Sendable {
 
     public struct Toolset: Codable, Sendable {
         public struct Tool: Codable, Sendable {
+            public let path: String?
             public let extraCLIOptions: [String]?
 
-            public init(extraCLIOptions: [String]? = nil) {
+            public init(path: String? = nil, extraCLIOptions: [String]? = nil) {
+                self.path = path
                 self.extraCLIOptions = extraCLIOptions
             }
         }
@@ -77,15 +79,35 @@ public struct SwiftSDK: Sendable {
         public let schemaVersion: String
         public let rootPath: String?
         public let cCompiler: Tool?
+        public let cxxCompiler: Tool?
         public let swiftCompiler: Tool?
         public let linker: Tool?
+        public let librarian: Tool?
 
-        public init(schemaVersion: String = "1.0", rootPath: String? = nil, cCompiler: Tool? = nil, swiftCompiler: Tool? = nil, linker: Tool? = nil) {
+        public init(schemaVersion: String = "1.0", rootPath: String? = nil, cCompiler: Tool? = nil, cxxCompiler: Tool? = nil, swiftCompiler: Tool? = nil, linker: Tool? = nil, librarian: Tool? = nil) {
             self.schemaVersion = schemaVersion
             self.rootPath = rootPath
             self.cCompiler = cCompiler
+            self.cxxCompiler = cxxCompiler
             self.swiftCompiler = swiftCompiler
             self.linker = linker
+            self.librarian = librarian
+        }
+
+        public func resolveToolPath(_ path: String, toolsetPath: Path) -> Path {
+            let toolPath = Path(path)
+            if toolPath.isAbsolute {
+                return toolPath
+            }
+            if let rootPath {
+                let root = Path(rootPath)
+                if root.isAbsolute {
+                    return root.join(toolPath)
+                } else {
+                    return toolsetPath.dirname.join(root).join(toolPath)
+                }
+            }
+            return toolsetPath.dirname.join(toolPath)
         }
     }
 

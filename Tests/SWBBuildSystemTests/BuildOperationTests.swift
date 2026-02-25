@@ -7958,7 +7958,7 @@ That command depends on command in Target 'agg2' (project \'aProject\'): script 
                                 "SDKROOT": "$(HOST_PLATFORM)",
                                 "SUPPORTED_PLATFORMS": "$(HOST_PLATFORM)",
                                 "SWIFT_VERSION": swiftVersion,
-                                "SWIFT_SDK_TOOLSETS": toolsetPath.str,
+                                "SWIFT_SDK_TOOLSETS": toolsetPath.strWithPosixSlashes,
                                 "CODE_SIGNING_ALLOWED": "NO",
                             ]
                         )],
@@ -7974,7 +7974,7 @@ That command depends on command in Target 'agg2' (project \'aProject\'): script 
             let tester = try await BuildOperationTester(getCore(), testWorkspace, simulated: false)
             let SRCROOT = testWorkspace.sourceRoot.join("aProject")
 
-            try await tester.fs.writeFileContents(SRCROOT.join("Sources/main.swift")) { contents in
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources").join("main.swift")) { contents in
                 contents <<< """
                     print("hello, world!")
                 """

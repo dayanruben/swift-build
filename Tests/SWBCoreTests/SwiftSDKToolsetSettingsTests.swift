@@ -62,13 +62,32 @@ fileprivate struct SwiftSDKToolsetSettingsTests: CoreBasedTests {
     }
 
     @Test(.requireSDKs(.host))
-    func swiftToolsetBasics() async throws {
+    func toolsetBasics() async throws {
         try await withTemporaryDirectory { tmpDir in
             let toolsetPath = tmpDir.join("toolset.json")
-            try writeToolsetJSON(SwiftSDK.Toolset(swiftCompiler: .init(extraCLIOptions: ["-static-stdlib"])), to: toolsetPath)
-            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": toolsetPath.str])
-            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains("-static-stdlib"))
-            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_LDFLAGS).contains("-static-stdlib"))
+            let toolset = SwiftSDK.Toolset(
+                rootPath: Path.root.join("toolchain").str,
+                cCompiler: .init(path: Path("bin").join("clang").str, extraCLIOptions: ["-DCFLAG"]),
+                cxxCompiler: .init(path: Path("bin").join("clang++").str, extraCLIOptions: ["-DCXXFLAG"]),
+                swiftCompiler: .init(path: Path("bin").join("swiftc").str, extraCLIOptions: ["-DSWIFTFLAG"]),
+                linker: .init(path: Path("bin").join("ld").str, extraCLIOptions: ["-lLib"]),
+                librarian: .init(path: Path("bin").join("libtool").str, extraCLIOptions: ["-lOtherLib"])
+            )
+            try writeToolsetJSON(toolset, to: toolsetPath)
+            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": toolsetPath.strWithPosixSlashes])
+
+            #expect(settings.globalScope.evaluate(BuiltinMacros.SWIFT_EXEC).str == Path.root.join("toolchain").join("bin").join("swiftc").str)
+            #expect(settings.globalScope.evaluate(BuiltinMacros.CC).str == Path.root.join("toolchain").join("bin").join("clang").str)
+            #expect(settings.globalScope.evaluate(BuiltinMacros.CPLUSPLUS).str == Path.root.join("toolchain").join("bin").join("clang++").str)
+            #expect(settings.globalScope.evaluate(BuiltinMacros.ALTERNATE_LINKER_PATH).str == Path.root.join("toolchain").join("bin").join("ld").str)
+            #expect(settings.globalScope.evaluate(BuiltinMacros.AR).str == Path.root.join("toolchain").join("bin").join("libtool").str)
+            #expect(settings.globalScope.evaluate(BuiltinMacros.LIBTOOL).str == Path.root.join("toolchain").join("bin").join("libtool").str)
+
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_CFLAGS).contains("-DCFLAG"))
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_CPLUSPLUSFLAGS).contains("-DCXXFLAG"))
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains("-DSWIFTFLAG"))
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_LDFLAGS).contains("-lLib"))
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_LIBTOOLFLAGS).contains("-lOtherLib"))
         }
     }
 
@@ -79,9 +98,10 @@ fileprivate struct SwiftSDKToolsetSettingsTests: CoreBasedTests {
             let toolset2Path = tmpDir.join("toolset2.json")
             try writeToolsetJSON(SwiftSDK.Toolset(swiftCompiler: .init(extraCLIOptions: ["-DFoo"])), to: toolset1Path)
             try writeToolsetJSON(SwiftSDK.Toolset(swiftCompiler: .init(extraCLIOptions: ["-DBar"])), to: toolset2Path)
-            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": "\(toolset1Path.str) \(toolset2Path.str)"])
+            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": "\(toolset1Path.strWithPosixSlashes) \(toolset2Path.strWithPosixSlashes)"])
 
-            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS) == ["-DFoo", "-DBar"])
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains("-DFoo"))
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains("-DBar"))
         }
     }
 
@@ -90,8 +110,60 @@ fileprivate struct SwiftSDKToolsetSettingsTests: CoreBasedTests {
         try await withTemporaryDirectory { tmpDir in
             let toolsetPath = tmpDir.join("toolset.json")
             try writeToolsetJSON(SwiftSDK.Toolset(schemaVersion: "99.0"), to: toolsetPath)
-            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": toolsetPath.str])
+            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": toolsetPath.strWithPosixSlashes])
             #expect(settings.errors.only?.hasPrefix("error processing toolset ") == true)
+        }
+    }
+
+    @Test(.requireSDKs(.host))
+    func swiftCompilerFlagsPassedToLinkerDriver() async throws {
+        try await withTemporaryDirectory { tmpDir in
+            let toolsetPath = tmpDir.join("toolset.json")
+            let toolset = SwiftSDK.Toolset(
+                swiftCompiler: .init(extraCLIOptions: ["-DSWIFTFLAG"])
+            )
+            try writeToolsetJSON(toolset, to: toolsetPath)
+            let settings = try await createTestSettings(projectBuildSettings: [
+                "SWIFT_SDK_TOOLSETS": toolsetPath.strWithPosixSlashes,
+                "LINKER_DRIVER": "swiftc",
+            ])
+
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains("-DSWIFTFLAG"))
+            #expect(settings.globalScope.evaluate(BuiltinMacros.OTHER_LDFLAGS).contains("-DSWIFTFLAG"))
+
+            let settings2 = try await createTestSettings(projectBuildSettings: [
+                "SWIFT_SDK_TOOLSETS": toolsetPath.strWithPosixSlashes,
+                "LINKER_DRIVER": "clang",
+            ])
+
+            #expect(settings2.globalScope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains("-DSWIFTFLAG"))
+            #expect(!settings2.globalScope.evaluate(BuiltinMacros.OTHER_LDFLAGS).contains("-DSWIFTFLAG"))
+        }
+    }
+
+    @Test(.requireSDKs(.host))
+    func toolPathResolution() async throws {
+        try await withTemporaryDirectory { tmpDir in
+            let toolsetPath = tmpDir.join("sdk/toolset.json")
+            let toolset = SwiftSDK.Toolset(
+                rootPath: Path.root.join("toolchain").str,
+                cCompiler: .init(path: Path.root.join("usr").join("bin").join("clang").str),
+                swiftCompiler: .init(path: Path("bin").join("swiftc").str),
+            )
+            try writeToolsetJSON(toolset, to: toolsetPath)
+            let settings = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": toolsetPath.strWithPosixSlashes])
+
+            #expect(settings.globalScope.evaluate(BuiltinMacros.CC).str == Path.root.join("usr").join("bin").join("clang").str)
+            #expect(settings.globalScope.evaluate(BuiltinMacros.SWIFT_EXEC).str == Path.root.join("toolchain").join("bin").join("swiftc").str)
+
+            let toolsetPath2 = tmpDir.join("sdk/toolset2.json")
+            let toolset2 = SwiftSDK.Toolset(
+                cxxCompiler: .init(path: Path("bin").join("clang++").str)
+            )
+            try writeToolsetJSON(toolset2, to: toolsetPath2)
+            let settings2 = try await createTestSettings(projectBuildSettings: ["SWIFT_SDK_TOOLSETS": toolsetPath2.strWithPosixSlashes])
+
+            #expect(settings2.globalScope.evaluate(BuiltinMacros.CPLUSPLUS) == tmpDir.join("sdk").join("bin").join("clang++"))
         }
     }
 }
