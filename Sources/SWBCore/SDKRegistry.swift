@@ -1116,8 +1116,6 @@ public final class SDKRegistry: SDKRegistryLookup, CustomStringConvertible, Send
                 continue
             }
 
-            let toolsets = try tripleProperties.loadToolsets(sdk: swiftSDK, fs: localFS)
-
             let sdkroot = swiftSDK.path.join(tripleProperties.sdkRootPath)
 
             // TODO support dynamic resources path
@@ -1142,9 +1140,10 @@ public final class SDKRegistry: SDKRegistryLookup, CustomStringConvertible, Send
 
             // TODO handle tripleProperties.toolSearchPaths
 
-            let extraSwiftCompilerSettings = Array(toolsets.map( { $0.swiftCompiler?.extraCLIOptions ?? [] }).flatMap( { $0 }))
             let headerSearchPaths: [PropertyListItem] = ["$(inherited)"] + (tripleProperties.includeSearchPaths ?? []).map( { PropertyListItem.plString($0) } )
             let librarySearchPaths: [PropertyListItem] = ["$(inherited)"] + (tripleProperties.librarySearchPaths ?? []).map( { PropertyListItem.plString($0) } )
+
+            let toolsetAbsolutePaths: [PropertyListItem] = (tripleProperties.toolsetPaths ?? []).map { .plString(swiftSDK.path.join($0).str) }
 
             let sdk = registerSDK(
                 sdkroot, sdkroot, platform, .plDict([
@@ -1155,16 +1154,15 @@ public final class SDKRegistry: SDKRegistryLookup, CustomStringConvertible, Send
                 "IsBaseSDK": .plBool(true),
                 "DefaultProperties": .plDict([
                     "PLATFORM_NAME": .plString(platform.name),
+                    "SWIFT_SDK_TOOLSETS": .plArray(toolsetAbsolutePaths),
                 ].merging(defaultProperties, uniquingKeysWith: { _, new in new })),
                 "CustomProperties": .plDict([
                     "LIBRARY_SEARCH_PATHS": .plArray(librarySearchPaths),
                     "HEADER_SEARCH_PATHS": .plArray(headerSearchPaths),
-                    "OTHER_SWIFT_FLAGS": .plArray(["$(inherited)"] + extraSwiftCompilerSettings.map( {.plString($0)} )),
                     "SWIFTC_RESOURCE_DIR": .plString(swiftResourceDir.str), // Resource dir for linking Swift
                     "SWIFT_RESOURCE_DIR": .plString(swiftResourceDir.str), // Resource dir for compiling Swift
                     "CLANG_RESOURCE_DIR": .plString(clangResourceDir.str), // Resource dir for linking C/C++/Obj-C
                     "SDKROOT": .plString(sdkroot.str),
-                    "OTHER_LDFLAGS": .plArray(["$(inherited)"] + extraSwiftCompilerSettings.map( {.plString($0)} )), // The extra swift compiler settings in JSON are intended to go to the linker driver too
                 ].merging(customProperties, uniquingKeysWith: { _, new in new})),
                 "SupportedTargets": .plDict([
                     platform.name: .plDict(targetProperties)

@@ -674,11 +674,11 @@ public final class Settings: PlatformBuildContext, Sendable {
     /// Target-specific counterpart of `diagnostics`.
     public let targetDiagnostics: OrderedSet<Diagnostic>
 
-    /// The list of XCConfigs used to construct the settings.
-    let macroConfigPaths: [Path]
+    /// The list of files read to construct the settings.
+    let inputPathsAffectingSettings: [Path]
 
-    /// The signature of the XCConfigs used to construct the settings.
-    public let macroConfigSignature: FilesSignature
+    /// The signature of the files used to construct the settings.
+    public let inputPathsAffectingSettingsSignature: FilesSignature
 
     /// The list of system build rules to use for these settings.
     public let systemBuildRules: [(any BuildRuleCondition, any BuildRuleAction)]
@@ -832,8 +832,8 @@ public final class Settings: PlatformBuildContext, Sendable {
         self.preferredArch = builder.preferredArch
         self.exportedMacroNames = builder.exportedMacroNames
         self.exportedNativeMacroNames = builder.exportedNativeMacroNames
-        self.macroConfigPaths = builder.macroConfigPaths.elements
-        self.macroConfigSignature = builder.macroConfigSignature
+        self.inputPathsAffectingSettings = builder.inputPathsAffectingSettings.elements
+        self.inputPathsAffectingSettingsSignature = builder.inputPathsAffectingSettingsSignature
         self.signingSettings = builder.signingSettings
 
         // Create the global evaluation scope.  This uses the bound SDK if the SettingsContext's purpose wants that condition.
@@ -1371,15 +1371,15 @@ private class SettingsBuilder: ProjectMatchLookup {
 
     // FIXME: Shouldn't this be separated into sets for each base xcconfig file used (project level, target level, xcodebuild override level)?  A given xcconfig might be #included separately at multiple levels, but it will only be reflected here at the lowest level due to the way this set if built up.  But maybe for what this set is used for that doesn't materially matter.
     //
-    /// The list of XCConfigs used by the receiver.
+    /// The list of files used by the receiver.
     ///
     /// This is an ordered set because each #included xcconfig file is only used once and the order of inclusion is significant.
-    var macroConfigPaths = OrderedSet<Path>()
+    var inputPathsAffectingSettings = OrderedSet<Path>()
 
     /// The signature of the XCConfigs used by the receiver.
-    var macroConfigSignature: FilesSignature { return macroConfigSignatureCache.getValue(self) }
-    var macroConfigSignatureCache = LazyCache { (builder: SettingsBuilder) -> FilesSignature in
-        return builder.workspaceContext.fs.filesSignature(builder.macroConfigPaths.elements)
+    var inputPathsAffectingSettingsSignature: FilesSignature { return inputPathsAffectingSettingsSignatureCache.getValue(self) }
+    var inputPathsAffectingSettingsSignatureCache = LazyCache { (builder: SettingsBuilder) -> FilesSignature in
+        return builder.workspaceContext.fs.filesSignature(builder.inputPathsAffectingSettings.elements)
     }
 
     var core: Core {
@@ -1542,6 +1542,11 @@ private class SettingsBuilder: ProjectMatchLookup {
         if let target = self.target, let config = targetConfiguration {
             addTargetSettings(target, specLookupContext, config, boundProperties.sdk, usesAutomaticSDK: boundProperties.settings[BuiltinMacros.SDKROOT] == "auto")
         }
+
+        // Add settings derived from Swift SDK toolset.json files. This is done after project and target
+        // settings so that SWIFT_SDK_TOOLSETS can be specified as either a user build setting (if passed
+        // on the SwiftPM command line) or as a default property of an SDK (synthesized from a Swift SDK).
+        addSwiftSDKToolsetSettings(boundProperties.sdk)
 
         // If we're constructing a Settings object for use by the editor, then we stop here; we don't add any overrides.
         guard settingsContext.purpose.includeOverrides else {
@@ -2847,6 +2852,68 @@ private class SettingsBuilder: ProjectMatchLookup {
         }
     }
 
+    func addSwiftSDKToolsetSettings(_ sdk: SDK?) {
+        let scope = createScope(sdkToUse: sdk)
+        for toolsetPath in scope.evaluate(BuiltinMacros.SWIFT_SDK_TOOLSETS).map(Path.init) {
+            inputPathsAffectingSettings.append(toolsetPath)
+            do {
+                let toolset = try buildRequestContext.loadToolset(toolsetPath)
+
+                pushTable(.exportedForNative) { table in
+                    if let path = toolset.swiftCompiler?.path {
+                        table.push(BuiltinMacros.SWIFT_EXEC, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.swiftCompiler?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_SWIFT_FLAGS, table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                        // Historically, SwiftPM passed extra swift compiler flags to swiftc when used as a linker driver.
+                        // To maintain compatibility wherever possible, continue doing this when using swiftc to link.
+                        // In the future, we should consider changes to the toolset.json spec so users can make it clear
+                        // whether or not this behavior is desired.
+                        table.push(
+                            table.namespace.lookupOrDeclareMacro(StringListMacroDeclaration.self, "OTHER_LDFLAGS_FROM_TOOLSET_LINKER_DRIVER_swiftc"),
+                            table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions)
+                        )
+                        table.push(
+                            BuiltinMacros.OTHER_LDFLAGS,
+                            table.namespace.parseStringList(["$(inherited)", "$(OTHER_LDFLAGS_FROM_TOOLSET_LINKER_DRIVER_$(LINKER_DRIVER))"])
+                        )
+                    }
+                    if let path = toolset.cCompiler?.path {
+                        table.push(BuiltinMacros.CC, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.cCompiler?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_CFLAGS, table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                    if let path = toolset.cxxCompiler?.path {
+                        table.push(BuiltinMacros.CPLUSPLUS, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.cxxCompiler?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_CPLUSPLUSFLAGS, table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                    if let path = toolset.linker?.path {
+                        // To match historical SwiftPM behavior, we treat this as the path to the underlying linker as opposed to the linker driver.
+                        table.push(BuiltinMacros.ALTERNATE_LINKER_PATH, literal: toolset.resolveToolPath(path, toolsetPath: toolsetPath).str)
+                    }
+                    if let extraCLIOptions = toolset.linker?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_LDFLAGS,
+                                   table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                    if let path = toolset.librarian?.path {
+                        let resolved = toolset.resolveToolPath(path, toolsetPath: toolsetPath).str
+                        table.push(BuiltinMacros.AR, literal: resolved)
+                        table.push(BuiltinMacros.LIBTOOL, literal: resolved)
+                    }
+                    if let extraCLIOptions = toolset.librarian?.extraCLIOptions, !extraCLIOptions.isEmpty {
+                        table.push(BuiltinMacros.OTHER_LIBTOOLFLAGS,
+                                   table.namespace.parseStringList(["$(inherited)"] + extraCLIOptions))
+                    }
+                }
+            } catch {
+                self.errors.append("error processing toolset at \(toolsetPath.str): \(error)")
+            }
+        }
+    }
+
     /// Add the SDK overriding settings.
     func addSDKOverridingSettings(_ sdk: SDK, _ sdkVariant: SDKVariant?) {
         // Add the SDK's overriding settings.
@@ -2953,7 +3020,7 @@ private class SettingsBuilder: ProjectMatchLookup {
             // FIXME: It is unfortunate that we need to create a custom file path resolver just for this case (which will not use any cached values). This is also unfortunate from a user perspective, as it is not at all clear what settings could be used in an xcconfig file path. We should consider defining this more formally in a way that can also efficiently be evaluated.
             let resolver = FilePathResolver(scope: createScope(sdkToUse: sdk))
             let path = resolver.resolveAbsolutePath(configFileRef)
-            macroConfigPaths.append(path)
+            inputPathsAffectingSettings.append(path)
 
             // Load and push a settings table from the file.
             let info = buildRequestContext.getCachedMacroConfigFile(path, project: project, context: .baseConfiguration)
@@ -2966,7 +3033,7 @@ private class SettingsBuilder: ProjectMatchLookup {
             }
             self.diagnostics.append(contentsOf: info.diagnostics)
             for path in info.dependencyPaths {
-                macroConfigPaths.append(path)
+                inputPathsAffectingSettings.append(path)
             }
 
             // Save the settings table as part of the construction components.
@@ -3160,7 +3227,7 @@ private class SettingsBuilder: ProjectMatchLookup {
             // FIXME: It is unfortunate that we need to create a custom file path resolver just for this case. See the similar comment for adding project settings.
             let resolver = FilePathResolver(scope: createScope(sdkToUse: sdk))
             let path = resolver.resolveAbsolutePath(configFileRef)
-            macroConfigPaths.append(path)
+            inputPathsAffectingSettings.append(path)
 
             // Load and push a settings table from the file.
             let info = buildRequestContext.getCachedMacroConfigFile(path, project: project, context: .baseConfiguration)
@@ -3173,7 +3240,7 @@ private class SettingsBuilder: ProjectMatchLookup {
             }
             self.targetDiagnostics.append(contentsOf: info.diagnostics)
             for path in info.dependencyPaths {
-                macroConfigPaths.append(path)
+                inputPathsAffectingSettings.append(path)
             }
 
             // Save the settings table as part of the construction components.

@@ -3597,7 +3597,7 @@ fileprivate struct TaskConstructionTests: CoreBasedTests {
 
             let destination = RunDestinationInfo(buildTarget: .swiftSDK(sdkManifestPath: sdkManifestPath.str, triple: "wasm32-unknown-wasip1"), targetArchitecture: "wasm32", supportedArchitectures: ["wasm32"], disableOnlyActiveArch: false)
             let parameters = BuildParameters(configuration: "Debug", activeRunDestination: destination)
-            await tester.checkBuild(parameters, runDestination: nil) { results in
+            await tester.checkBuild(parameters, runDestination: nil, fs: localFS) { results in
                 results.checkTask(.matchTargetName("MyLibrary"), .matchRuleType("CompileC")) { task in
                     task.checkCommandLineContains([
                         [clangCompilerPath.str],

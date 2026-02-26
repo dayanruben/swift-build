@@ -199,7 +199,8 @@ open class MockTestTaskPlanningClientDelegate: TaskPlanningClientDelegate, @unch
             return .deferred
         case "cat": // docc
             return .deferred
-        case "clang" where args.first == "-v":
+        case "clang" where args.first == "-v",
+             "clang++" where args.first == "-v":
             return .deferred
         case "distill" where args == ["--version"]:
             return .deferred
