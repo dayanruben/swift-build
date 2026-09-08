@@ -1856,8 +1856,8 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
         }
     }
 
-    @Test(.requireSDKs(.macOS))
-    func incrementalBuild_invalidateDownstreamPlanning() async throws {
+    @Test(.requireSDKs(.macOS), arguments: [SwiftDependencyRegistrationMode.makeStyleDependenciesSupplementedByScanner, .swiftDependencyScannerOnly])
+    func incrementalBuild_invalidateDownstreamPlanning(_ registrationMode: SwiftDependencyRegistrationMode) async throws {
 
         try await withTemporaryDirectory { tmpDirPath async throws -> Void in
             let testWorkspace = try await TestWorkspace(
@@ -1883,6 +1883,8 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
                                     "ARCHS": "arm64e",
 
                                     "SWIFT_USE_INTEGRATED_DRIVER": "YES",
+                                    "SWIFT_ENABLE_EXPLICIT_MODULES": "YES",
+                                    "SWIFT_DEPENDENCY_REGISTRATION_MODE": registrationMode.rawValue,
                                 ])
                         ],
                         targets: [
@@ -2072,6 +2074,62 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
                 results.checkTaskExists(.matchRuleType("SwiftCompile"))
             }
             try await tester.checkNullBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true)
+        }
+    }
+
+    @Test(.requireSDKs(.macOS))
+    func scannerOnlyGeneratedSwiftHeaderViaBridgingIncremental() async throws {
+        try await withTemporaryDirectory { tmpDir in
+            let testWorkspace = try await TestWorkspace("Test", sourceRoot: tmpDir.join("Test"), projects: [
+                TestProject("aProject",
+                    groupTree: TestGroup("Sources", path: "Sources", children: [
+                        TestFile("a.swift"),
+                        TestFile("Bridging-Header.h"),
+                        TestFile("b.swift"),
+                    ]),
+                    buildConfigurations: [TestBuildConfiguration("Debug", buildSettings: [
+                        "PRODUCT_NAME": "$(TARGET_NAME)",
+                        "SWIFT_VERSION": swiftVersion,
+                        "BUILD_VARIANTS": "normal",
+                        "ARCHS": "arm64",
+                        "SWIFT_USE_INTEGRATED_DRIVER": "YES",
+                        "SWIFT_ENABLE_EXPLICIT_MODULES": "YES",
+                        "DEFINES_MODULE": "YES",
+                        "SWIFT_INSTALL_OBJC_HEADER": "YES",
+                        "SWIFT_DEPENDENCY_REGISTRATION_MODE": "dependency-scanner",
+                    ])],
+                    targets: [
+                        TestStandardTarget("TargetA", type: .framework, buildPhases: [
+                            TestSourcesBuildPhase(["a.swift"]),
+                        ]),
+                        TestStandardTarget("TargetB", type: .framework,
+                            buildConfigurations: [TestBuildConfiguration("Debug", buildSettings: [
+                                "SWIFT_OBJC_BRIDGING_HEADER": "Sources/Bridging-Header.h",
+                            ])],
+                            buildPhases: [
+                                TestSourcesBuildPhase(["b.swift"]),
+                                TestFrameworksBuildPhase([TestBuildFile(.target("TargetA"))]),
+                            ], dependencies: ["TargetA"]),
+                    ])])
+
+            let tester = try await BuildOperationTester(getCore(), testWorkspace, simulated: false)
+            let parameters = BuildParameters(configuration: "Debug")
+            let buildRequest = BuildRequest(parameters: parameters, buildTargets: tester.workspace.projects[0].targets.map({ BuildRequest.BuildTargetInfo(parameters: parameters, target: $0) }), continueBuildingAfterErrors: false, useParallelTargets: true, useImplicitDependencies: false, useDryRun: false)
+            let SRCROOT = testWorkspace.sourceRoot.join("aProject")
+
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/a.swift"), waitForNewTimestamp: true) { $0 <<< "import Foundation\n@objc public class Widget: NSObject { @objc public func original() {} }\n" }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Bridging-Header.h"), waitForNewTimestamp: true) { $0 <<< "#import <TargetA/TargetA-Swift.h>\n" }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/b.swift"), waitForNewTimestamp: true) { $0 <<< "public struct B { public init() {} }\n" }
+
+            try await tester.checkBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true) { $0.checkNoErrors() }
+            try await tester.checkNullBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true)
+
+            // Editing TargetA's @objc API should recompile TargetB.
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/a.swift"), waitForNewTimestamp: true) { $0 <<< "import Foundation\n@objc public class Widget: NSObject { @objc public func original() {}; @objc public func added() {} }\n" }
+            try await tester.checkBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true) { results in
+                results.checkNoErrors()
+                results.checkTaskExists(.matchRuleType("SwiftCompile"), .matchTargetName("TargetB"))
+            }
         }
     }
 
@@ -4582,8 +4640,8 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
         }
     }
 
-    @Test(.requireSDKs(.macOS))
-    func userModuleHeaderChangeInvalidatesPlanning() async throws {
+    @Test(.requireSDKs(.macOS), arguments: [SwiftDependencyRegistrationMode.makeStyleDependenciesSupplementedByScanner, .swiftDependencyScannerOnly])
+    func userModuleHeaderChangeInvalidatesPlanning(_ registrationMode: SwiftDependencyRegistrationMode) async throws {
         try await withTemporaryDirectory { tmpDir in
             let testWorkspace = try await TestWorkspace(
                 "Test",
@@ -4604,6 +4662,8 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
                                 "PRODUCT_NAME": "$(TARGET_NAME)",
                                 "CLANG_ENABLE_MODULES": "YES",
                                 "SWIFT_ENABLE_EXPLICIT_MODULES": "YES",
+                                "SWIFT_USE_INTEGRATED_DRIVER": "YES",
+                                "SWIFT_DEPENDENCY_REGISTRATION_MODE": registrationMode.rawValue,
                                 "SWIFT_VERSION": swiftVersion,
                                 "DEFINES_MODULE": "YES",
                                 "VALID_ARCHS": "arm64",
