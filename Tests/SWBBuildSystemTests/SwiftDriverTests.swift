@@ -525,6 +525,97 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
         }
     }
 
+    /// Verify mode must report the bridging header's textual includes
+    @Test(.requireSDKs(.macOS))
+    func verifyScannerDependenciesWithBridgingHeader() async throws {
+        try await withTemporaryDirectory { tmpDirPath async throws -> Void in
+            let sourceRootPath = tmpDirPath.join("Test")
+            let testWorkspace = try await TestWorkspace(
+                "Test",
+                sourceRoot: sourceRootPath,
+                projects: [
+                    TestProject(
+                        "aProject",
+                        groupTree: TestGroup(
+                            "Sources",
+                            path: "Sources",
+                            children: [
+                                TestFile("Bridging-Header.h"),
+                                TestFile("Helper.h"),
+                                TestFile("Deep.h"),
+                                TestFile("file1.swift"),
+                            ]),
+                        buildConfigurations: [
+                            TestBuildConfiguration(
+                                "Debug",
+                                buildSettings: [
+                                    "PRODUCT_NAME": "$(TARGET_NAME)",
+                                    "SWIFT_VERSION": swiftVersion,
+                                    "BUILD_VARIANTS": "normal",
+                                    "ARCHS": "arm64",
+                                    "SWIFT_OBJC_BRIDGING_HEADER": "Sources/Bridging-Header.h",
+                                    "SWIFT_USE_INTEGRATED_DRIVER": "YES",
+                                    "SWIFT_ENABLE_EXPLICIT_MODULES": "YES",
+                                    "SWIFT_DEPENDENCY_REGISTRATION_MODE": "verify-swift-dependency-scanner",
+                                ])
+                        ],
+                        targets: [
+                            TestStandardTarget(
+                                "TargetA",
+                                type: .framework,
+                                buildPhases: [
+                                    TestSourcesBuildPhase([
+                                        "file1.swift",
+                                    ]),
+                                    TestHeadersBuildPhase([
+                                        "Bridging-Header.h",
+                                        "Helper.h",
+                                        "Deep.h",
+                                    ])
+                                ]),
+                        ])
+                ])
+
+            let tester = try await BuildOperationTester(getCore(), testWorkspace, simulated: false)
+            let parameters = BuildParameters(configuration: "Debug")
+            let buildRequest = BuildRequest(parameters: parameters, buildTargets: tester.workspace.projects[0].targets.map({ BuildRequest.BuildTargetInfo(parameters: parameters, target: $0) }), continueBuildingAfterErrors: true, useParallelTargets: true, useImplicitDependencies: false, useDryRun: false)
+            let SRCROOT = testWorkspace.sourceRoot.join("aProject")
+
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Deep.h")) { file in
+                file <<<
+                        """
+                        int deep(void);
+                        """
+            }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Helper.h")) { file in
+                file <<<
+                        """
+                        #import "Deep.h"
+                        int helper(void);
+                        """
+            }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Bridging-Header.h")) { file in
+                file <<<
+                        """
+                        #import "Helper.h"
+                        """
+            }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/file1.swift")) { file in
+                file <<<
+                        """
+                        public struct A {
+                            public init() {}
+                        }
+                        """
+            }
+
+            try await tester.checkBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true) { results in
+                // The scanner reports the bridging header's includes
+                results.checkNoErrors()
+            }
+        }
+    }
+
     @Test(.requireSDKs(.host), arguments: [true, false])
     func verifyModule(enableWMO: Bool) async throws {
         try await withTemporaryDirectory { tmpDirPath async throws -> Void in
@@ -1860,6 +1951,127 @@ fileprivate struct SwiftDriverTests: CoreBasedTests {
                 results.checkTaskExists(.matchTargetName("TargetA"), .matchRuleType("SwiftDriver"))
                 results.checkTaskExists(.matchTargetName("TargetB"), .matchRuleType("SwiftDriver"))
             }
+        }
+    }
+
+    /// Scanner-only mode must track a header pulled in transitively through the bridging header
+    @Test(.requireSDKs(.macOS))
+    func scannerOnlyBridgingHeaderIncludeStaleBuild() async throws {
+        try await withTemporaryDirectory { tmpDirPath async throws -> Void in
+            let testWorkspace = try await TestWorkspace(
+                "Test",
+                sourceRoot: tmpDirPath.join("Test"),
+                projects: [
+                    TestProject(
+                        "aProject",
+                        groupTree: TestGroup(
+                            "Sources",
+                            path: "Sources",
+                            children: [
+                                TestFile("Bridging-Header.h"),
+                                TestFile("Helper.h"),
+                                TestFile("Deep.h"),
+                                TestFile("file1.swift"),
+                            ]),
+                        buildConfigurations: [
+                            TestBuildConfiguration(
+                                "Debug",
+                                buildSettings: [
+                                    "PRODUCT_NAME": "$(TARGET_NAME)",
+                                    "SWIFT_VERSION": swiftVersion,
+                                    "BUILD_VARIANTS": "normal",
+                                    "ARCHS": "arm64",
+                                    "SWIFT_OBJC_BRIDGING_HEADER": "Sources/Bridging-Header.h",
+                                    "SWIFT_USE_INTEGRATED_DRIVER": "YES",
+                                    "SWIFT_ENABLE_EXPLICIT_MODULES": "YES",
+                                    "SWIFT_DEPENDENCY_REGISTRATION_MODE": "dependency-scanner",
+                                ])
+                        ],
+                        targets: [
+                            TestStandardTarget(
+                                "TargetA",
+                                type: .framework,
+                                buildPhases: [
+                                    TestSourcesBuildPhase([
+                                        "file1.swift",
+                                    ]),
+                                    TestHeadersBuildPhase([
+                                        "Bridging-Header.h",
+                                        "Helper.h",
+                                        "Deep.h",
+                                    ])
+                                ]),
+                        ])
+                ])
+
+            let tester = try await BuildOperationTester(getCore(), testWorkspace, simulated: false)
+            let parameters = BuildParameters(configuration: "Debug")
+            let buildRequest = BuildRequest(parameters: parameters, buildTargets: tester.workspace.projects[0].targets.map({ BuildRequest.BuildTargetInfo(parameters: parameters, target: $0) }), continueBuildingAfterErrors: false, useParallelTargets: true, useImplicitDependencies: false, useDryRun: false)
+            let SRCROOT = testWorkspace.sourceRoot.join("aProject")
+
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Deep.h"), waitForNewTimestamp: true) { file in
+                file <<<
+                    """
+                    static const int kDeepValue = 1;
+                    """
+            }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Helper.h"), waitForNewTimestamp: true) { file in
+                file <<<
+                    """
+                    #import "Deep.h"
+                    static const int kHelperValue = kDeepValue;
+                    """
+            }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Bridging-Header.h"), waitForNewTimestamp: true) { file in
+                file <<<
+                    """
+                    #import "Helper.h"
+                    """
+            }
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/file1.swift"), waitForNewTimestamp: true) { file in
+                file <<<
+                    """
+                    public struct A {
+                        public init() {}
+                        public let value = Int(kHelperValue)
+                    }
+                    """
+            }
+
+            try await tester.checkBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true) { results in
+                results.checkNoErrors()
+                results.checkTaskExists(.matchRuleType("SwiftCompile"))
+            }
+            try await tester.checkNullBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true)
+
+            // Editing the Swift source recompiles, so incremental tracking works in scanner-only mode.
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/file1.swift"), waitForNewTimestamp: true) { file in
+                file <<<
+                    """
+                    public struct A {
+                        public init() {}
+                        public let value = Int(kHelperValue) + 1
+                    }
+                    """
+            }
+            try await tester.checkBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true) { results in
+                results.checkNoErrors()
+                results.checkTaskExists(.matchRuleType("SwiftCompile"))
+            }
+            try await tester.checkNullBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true)
+
+            // Edit the deepest transitive include
+            try await tester.fs.writeFileContents(SRCROOT.join("Sources/Deep.h"), waitForNewTimestamp: true) { file in
+                file <<<
+                    """
+                    static const int kDeepValue = 42;
+                    """
+            }
+            try await tester.checkBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true) { results in
+                results.checkNoErrors()
+                results.checkTaskExists(.matchRuleType("SwiftCompile"))
+            }
+            try await tester.checkNullBuild(runDestination: .anyMac, buildRequest: buildRequest, persistent: true)
         }
     }
 
