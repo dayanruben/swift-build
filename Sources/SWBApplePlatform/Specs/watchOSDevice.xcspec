@@ -49,6 +49,7 @@
         Name = "armv7k";
         DeploymentTargetRange = ( "0", "9" );
         DeprecatedError = YES;
+        IncludeAsSwiftModuleOnlyArch = NO;
     },
     {
         _Domain = watchos;
