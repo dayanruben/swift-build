@@ -429,13 +429,10 @@ package final class ProductPostprocessingTaskProducer: PhasedTaskProducer, TaskP
                 paths.append((subscope.evaluate(BuiltinMacros.TARGET_BUILD_DIR).join(Path(previewBlankInjectionDylibPath)).normalize(), subscope, false, false, true))
             }
 
-            // If we are creating a TBD for this product, then also sign the .tbd file.
-            //
-            // FIXME: This is not strictly correct, because there are situations where these methods return true but we don't actually enable InstallAPI. We should resolve this eventually.
-            //
-            // TAPI will only be run when the output is a dylib.
-            // Swift static library may schedule installAPI phase to generate a swiftmodule.
-            if let productType = settings.productType, productType.supportsInstallAPI && (shouldUseInstallAPI(subscope, settings) || stubAPIDestination(subscope, settings) == .builtProduct) {
+            // Only sign the .tbd when installapi will actually produce it
+            let buildComponents = subscope.evaluate(BuiltinMacros.BUILD_COMPONENTS)
+            let willGenerateInstallAPI = buildComponents.contains("api") || (buildComponents.contains("build") && subscope.evaluate(BuiltinMacros.TAPI_ENABLE_VERIFICATION_MODE))
+            if let productType = settings.productType, productType.supportsInstallAPI && ((shouldUseInstallAPI(subscope, settings) && willGenerateInstallAPI) || stubAPIDestination(subscope, settings) == .builtProduct) {
                 let tapiOutputPath = Path(subscope.evaluate(BuiltinMacros.TAPI_OUTPUT_PATH))
                 paths.append((tapiOutputPath, subscope, false, false, false))
             }

@@ -24,6 +24,43 @@ import SWBTaskConstruction
 @Suite
 fileprivate struct InstallAPITaskConstructionTests: CoreBasedTests {
     @Test(.requireSDKs(.macOS))
+    func tbdNotSignedWhenNotProduced() async throws {
+        let testProject = try await TestProject(
+            "aProject",
+            sourceRoot: Path("/TEST"),
+            groupTree: TestGroup(
+                "SomeFiles", path: "Sources",
+                children: [TestFile("Mock.c")]),
+            buildConfigurations: [
+                TestBuildConfiguration("Debug", buildSettings: [
+                    "CODE_SIGN_IDENTITY": "-",
+                    "INFOPLIST_FILE": "Info.plist",
+                    "PRODUCT_NAME": "$(TARGET_NAME)",
+                    "SUPPORTS_TEXT_BASED_API": "YES",
+                    "TAPI_ENABLE_VERIFICATION_MODE": "NO",
+                    "SKIP_INSTALL": "NO",
+                    "TAPI_EXEC": tapiToolPath.str])],
+            targets: [
+                TestStandardTarget(
+                    "Fwk",
+                    type: .framework,
+                    buildPhases: [TestSourcesBuildPhase(["Mock.c"])])])
+        let tester = try await TaskConstructionTester(getCore(), testProject)
+
+        let fs = PseudoFS()
+        try fs.createDirectory(tester.workspace.projects[0].sourceRoot, recursive: true)
+        try await fs.writePlist(Path("/TEST/Info.plist"), .plDict([:]))
+
+        // checkBuild's integrity check flags "missing creator" if codesign signs the unproduced .tbd.
+        for action in [BuildAction.build, .install] {
+            await tester.checkBuild(BuildParameters(action: action, configuration: "Debug"), runDestination: .macOS, fs: fs) { results in
+                results.checkNoTask(.matchRuleType("GenerateTAPI"), .matchRuleItemBasename("Fwk.tbd"))
+                results.checkNoTask(.matchRuleType("CodeSign"), .matchRuleItemBasename("Fwk.tbd"))
+            }
+        }
+    }
+
+    @Test(.requireSDKs(.macOS))
     func TBDSigning() async throws {
         let testProject = try await TestProject(
             "aProject",
