@@ -2241,9 +2241,13 @@ private class SettingsBuilder: ProjectMatchLookup, TripleLookup {
         // FIXME: Arguably we should emit a warning if the optimization settings are out of sync, as the user may be getting weird results.  It's not clear if there are lots of old projects which might spuriously get such a warning, and this isn't a new state of affairs.
         table.push(BuiltinMacros.IS_UNOPTIMIZED_BUILD, literal: (scope.evaluate(BuiltinMacros.GCC_OPTIMIZATION_LEVEL) == "0" || scope.evaluate(BuiltinMacros.SWIFT_OPTIMIZATION_LEVEL) == "-Onone"))
 
-        // If unset, infer the default SWIFT_LIBRARY_LEVEL from the INSTALL_PATH.
+        // If unset, infer the default SWIFT_LIBRARY_LEVEL from the INSTALL_PATH.  An explicit
+        // -library-level in OTHER_SWIFT_FLAGS counts as set; it is emitted first, and last wins.
         if scope.evaluateAsString(BuiltinMacros.SWIFT_LIBRARY_LEVEL).isEmpty &&
-           scope.evaluate(BuiltinMacros.MACH_O_TYPE) == "mh_dylib" {
+           scope.evaluate(BuiltinMacros.MACH_O_TYPE) == "mh_dylib" &&
+           !scope.evaluate(BuiltinMacros.OTHER_SWIFT_FLAGS).contains(where: {
+               $0 == "-library-level"
+           }) {
             let privateInstallPaths = scope.evaluate(BuiltinMacros.__KNOWN_SPI_INSTALL_PATHS).map { Path($0) }
             // Public frameworks and libraries can be installed directly at these base
             // locations, or relocated under one of the known prefixes.

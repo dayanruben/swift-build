@@ -4164,6 +4164,22 @@ fileprivate struct SwiftTaskConstructionTests: CoreBasedTests {
                                                              "SWIFT_LIBRARY_LEVEL" : "spi"]) { task in
             task.checkCommandLineContains(["-library-level", "spi"])
         }
+
+        // An explicit -library-level in OTHER_SWIFT_FLAGS also takes precedence over SKIP_INSTALL.
+        try await checkLibraryLevelForConfig(targetType: .framework,
+                                             buildSettings: ["SKIP_INSTALL" : "YES",
+                                                             "SWIFT_ENABLE_IPI_LIBRARY_LEVEL" : "YES",
+                                                             "OTHER_SWIFT_FLAGS" : "-library-level spi"]) { task in
+            task.checkCommandLineContainsUninterrupted(["-library-level", "spi"])
+            task.checkCommandLineDoesNotContain("ipi")
+        }
+
+        // An explicit SWIFT_LIBRARY_LEVEL has precedence over library-level.
+        try await checkLibraryLevelForConfig(targetType: .framework,
+                                             buildSettings: ["SWIFT_LIBRARY_LEVEL" : "api",
+                                                             "OTHER_SWIFT_FLAGS" : "-library-level spi"]) { task in
+            task.checkCommandLineContainsUninterrupted(["-library-level", "api"])
+        }
     }
 
     // Test -ipi-clang-module emission for a Clang IPI (SKIP_INSTALL=YES + MODULEMAP_FILE under SRCROOT).
