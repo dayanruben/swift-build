@@ -3437,6 +3437,20 @@ private class SettingsBuilder: ProjectMatchLookup, TripleLookup {
         push(table)
     }
 
+    /// Applies an xcconfig override and tracks paths in `inputPathsAffectingSettings`
+    private func addXCConfigOverride(path: Path?, overrides: [String: String], context: MacroConfigLoadContext) {
+        guard let path else {
+            push(createTableFromUserSettings(overrides), .exported)
+            return
+        }
+        let info = buildRequestContext.getCachedMacroConfigFile(path, project: project, context: context)
+        push(info.table, .exported)
+        diagnostics.append(contentsOf: info.diagnostics)
+        for path in info.dependencyPaths {
+            inputPathsAffectingSettings.append(path)
+        }
+    }
+
     /// Add the various overriding settings.
     func addOverrides(sdk: SDK?) {
         push(getWorkspacePathOverrides(), .none)
@@ -3469,23 +3483,9 @@ private class SettingsBuilder: ProjectMatchLookup, TripleLookup {
             push(buildRequestContext.loadSettingsFromConfig(data: settingsExtension.xcconfigOverrideData(fromParameters: self.parameters), path: nil, namespace: workspaceContext.workspace.userNamespace, searchPaths: project.map { [$0.sourceRoot] } ?? []).table, .exported)
         }
 
-        // Add the command line xcconfig-based build settings.
-        if let path = parameters.commandLineConfigOverridesPath {
-            let info = buildRequestContext.getCachedMacroConfigFile(path, project: project, context: .commandLineConfiguration)
-            push(info.table, .exported)
-            self.diagnostics.append(contentsOf: info.diagnostics)
-        } else {
-            push(createTableFromUserSettings(parameters.commandLineConfigOverrides), .exported)
-        }
-
-        // Add the environment xcconfig-based build settings.
-        if let path = parameters.environmentConfigOverridesPath {
-            let info = buildRequestContext.getCachedMacroConfigFile(path, project: project, context: .environmentConfiguration)
-            push(info.table, .exported)
-            self.diagnostics.append(contentsOf: info.diagnostics)
-        } else {
-            push(createTableFromUserSettings(parameters.environmentConfigOverrides), .exported)
-        }
+        // Command-line and environment xcconfig overrides.
+        addXCConfigOverride(path: parameters.commandLineConfigOverridesPath, overrides: parameters.commandLineConfigOverrides, context: .commandLineConfiguration)
+        addXCConfigOverride(path: parameters.environmentConfigOverridesPath, overrides: parameters.environmentConfigOverrides, context: .environmentConfiguration)
 
         // Toolchain override
         if let toolchain = self.parameters.toolchainOverride {
