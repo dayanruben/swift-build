@@ -2268,16 +2268,19 @@ private class SettingsBuilder: ProjectMatchLookup, TripleLookup {
             }
             let installPath = scope.evaluate(BuiltinMacros.INSTALL_PATH)
 
-            if scope.evaluate(BuiltinMacros.SWIFT_ENABLE_IPI_LIBRARY_LEVEL)
-                && scope.evaluate(BuiltinMacros.SKIP_INSTALL) {
-                // Build-time / IPI module.
-                table.push(BuiltinMacros.SWIFT_LIBRARY_LEVEL, literal: "ipi")
-            } else if privateInstallPaths.contains(where: { $0.isAncestorOrEqual(of: installPath) }) {
+            // A known framework install path takes precedence over the IPI inference,
+            // e.g. the module having install path a private location must not be reclassified
+            // as project-internal (IPI) merely because SKIP_INSTALL happens to be YES.
+            if privateInstallPaths.contains(where: { $0.isAncestorOrEqual(of: installPath) }) {
                 // SPI module.
                 table.push(BuiltinMacros.SWIFT_LIBRARY_LEVEL, literal: "spi")
             } else if publicInstallPaths.contains(where: { $0.isAncestorOrEqual(of: installPath) }) {
                 // Public module.
                 table.push(BuiltinMacros.SWIFT_LIBRARY_LEVEL, literal: "api")
+            } else if scope.evaluate(BuiltinMacros.SWIFT_ENABLE_IPI_LIBRARY_LEVEL)
+                && scope.evaluate(BuiltinMacros.SKIP_INSTALL) {
+                // Build-time / IPI module: not installed to any known framework location.
+                table.push(BuiltinMacros.SWIFT_LIBRARY_LEVEL, literal: "ipi")
             }
             // Else, leave it to the compiler's default.
         }

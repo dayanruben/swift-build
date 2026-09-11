@@ -4140,6 +4140,17 @@ fileprivate struct SwiftTaskConstructionTests: CoreBasedTests {
             task.checkCommandLineContains(["-library-level", "ipi"])
         }
 
+        // A known private-framework install path takes precedence over IPI inference,
+        // even with SKIP_INSTALL=YES, it stays "spi" rather than being reclassified as project-internal.
+        try await checkLibraryLevelForConfig(targetType: .framework,
+                                             buildSettings: ["INSTALL_PATH" : "/System/Library/PrivateFrameworks/MyFramework",
+                                                             "SKIP_INSTALL"  : "YES",
+                                                             "SWIFT_ENABLE_IPI_LIBRARY_LEVEL" : "YES",
+                                                             "__KNOWN_SPI_INSTALL_PATHS" : "/System/Library/PrivateFrameworks"]) { task in
+            task.checkCommandLineContains(["-library-level", "spi"])
+            task.checkCommandLineDoesNotContain("ipi")
+        }
+
         // Don't infer "ipi" from SKIP_INSTALL when SWIFT_ENABLE_IPI_LIBRARY_LEVEL is explicitly NO.
         try await checkLibraryLevelForConfig(targetType: .framework,
                                              buildSettings: ["SKIP_INSTALL" : "YES",
